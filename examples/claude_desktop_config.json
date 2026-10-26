@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "privara": {
+      "command": "uv",
+      "args": ["--directory", "/ABSOLUTE/PATH/TO/privara/backend", "run", "privara", "mcp"],
+      "env": {
+        "PRIVARA_AGENT_KEY": "<paste the agent key from Agent Access>"
+      }
+    }
+  }
+}

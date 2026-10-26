@@ -1,0 +1,45 @@
+[project]
+name = "privara"
+version = "0.1.0"
+description = "Privara — a local privacy and action firewall for AI agents (MCP + REST)."
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "fastapi==0.115.12",
+  "uvicorn[standard]==0.34.2",
+  "pydantic==2.11.4",
+  "pydantic-settings==2.9.1",
+  "mcp==1.9.4",
+  "presidio-analyzer==2.2.358",
+  "cryptography==44.0.3",
+  "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+nlp = [
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==8.3.5",
+  "pytest-asyncio==0.26.0",
+]
+
+[project.scripts]
+privara = "privara.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["privara"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
