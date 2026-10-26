@@ -75,6 +75,7 @@ export interface Health {
   detector: { mode: string; model: string | null; fallback: boolean };
   default_decision: string;
   mcp_http: boolean;
+  deployment: "local" | "hosted";
 }
 
 export interface AuditEvent {

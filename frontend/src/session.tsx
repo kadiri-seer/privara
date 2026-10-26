@@ -9,6 +9,7 @@ interface SessionValue {
   health: Health | null;
   healthError: boolean;
   refreshHealth: () => Promise<void>;
+  hosted: boolean;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -49,7 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [refreshHealth]);
 
   return (
-    <SessionContext.Provider value={{ signedIn, signIn, signOut, replaceKey, health, healthError, refreshHealth }}>
+    <SessionContext.Provider value={{ signedIn, signIn, signOut, replaceKey, health, healthError, refreshHealth, hosted: health?.deployment === "hosted" }}>
       {children}
     </SessionContext.Provider>
   );

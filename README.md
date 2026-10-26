@@ -43,6 +43,10 @@ sign-in screen. Lost it? `uv --directory backend run privara admin-key` issues a
 Then, in the dashboard: **Overview → Run the demo** to watch a built-in agent exercise every rule over
 MCP, and **Privacy Lab** to sanitize your own text.
 
+**Putting it online:** the dashboard can be served from Vercel with the backend on Render (Docker +
+persistent disk). `./push-to-github.sh <repo-url>` publishes the project in a single commit and push.
+See [docs/DEPLOY.md](docs/DEPLOY.md).
+
 <details>
 <summary>Manual setup (without start.sh, e.g. on Windows)</summary>
 
@@ -124,6 +128,9 @@ All settings are environment variables (or `.env` in the repo root); see [.env.e
 | `PRIVARA_PENDING_APPROVAL_TTL_SECONDS` | `3600` | How long a request can wait for a decision. |
 | `PRIVARA_MCP_HTTP_ENABLED` | `true` | Serve MCP at `/mcp`. |
 | `PRIVARA_LOG_LEVEL` | `INFO` | Logs never include request bodies, values or keys. |
+| `PRIVARA_DEPLOYMENT` | `local` | `hosted` behind a platform proxy: trusts `X-Forwarded-*`, requires a 32+ character bootstrap key, adjusts dashboard wording. |
+| `PRIVARA_AUTH_FAILURES_PER_MINUTE` | `20` | Failed sign-ins per client address per minute before `429`. |
+| `PORT` | — | Used when `PRIVARA_PORT` is unset (Render, Railway). |
 
 ## CLI
 
@@ -151,17 +158,18 @@ backend/privara/
   mcp_server.py MCP server (stdio, HTTP, in-memory)
   api.py        FastAPI app, middleware, error format, dashboard hosting
   demo.py       built-in demo agent
-backend/tests/  93 tests: privacy, policy, gateway security, REST, MCP
+backend/tests/  100 tests: privacy, policy, gateway security, REST, MCP, hosted mode
 frontend/       React + TypeScript + Vite + Tailwind dashboard (vitest tests in src/__tests__)
-docs/           THREAT_MODEL.md, API.md, MCP.md
+docs/           THREAT_MODEL.md, API.md, MCP.md, DEPLOY.md
+Dockerfile, render.yaml, vercel.json   hosted deployment (see docs/DEPLOY.md)
 examples/       MCP client, client config, REST walkthrough
 ```
 
 ## Tests
 
 ```bash
-uv --directory backend run pytest          # backend: 93 tests
-cd frontend && npm test && npx tsc -b      # dashboard: 9 interaction tests + type check
+uv --directory backend run pytest          # backend: 100 tests
+cd frontend && npm test && npx tsc -b      # dashboard: 10 interaction tests + type check
 ```
 
 Covered: deterministic redaction and placeholder reuse, session isolation, fallback detection,
@@ -200,7 +208,8 @@ status codes, demo run and reset, and persistence across restarts.
   the main database (audit, policies) is not encrypted, by design contains no original values, and relies
   on owner-only file permissions (POSIX).
 - **Single operator.** One admin role; no multi-user accounts or per-operator permissions.
-- **No rate limiting** of failed authentication attempts (keys carry 256 bits of entropy).
+- **Throttling is basic**: failed sign-ins are limited per client address in memory (reset on restart).
+  There is no general request rate limiting.
 - **Sandbox races.** Paths are resolved and opened with `O_NOFOLLOW`, but a local process racing to swap
   directories for symlinks between check and open is out of scope.
 - **`restore_text` only restores placeholders from the agent’s own session**; values in a different

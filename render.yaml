@@ -1,0 +1,29 @@
+# Render Blueprint for the Privara server (https://render.com/docs/blueprint-spec).
+# Deploy: Render dashboard → New → Blueprint → pick this repository.
+#
+# Cost: the "starter" instance (512 MB RAM) plus a 1 GB persistent disk. Render's free instance type
+# cannot attach a disk and wipes its filesystem whenever it sleeps, so agents, policies, keys and the
+# audit log would be lost repeatedly. To try it for free anyway, set plan: free and delete the disk block.
+services:
+  - type: web
+    name: privara-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: starter
+    region: frankfurt
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: privara-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      # Render generates a random 256-bit value. Read it under Environment to sign in to the dashboard.
+      - key: PRIVARA_ADMIN_API_KEY
+        generateValue: true
+      # Your Vercel domain(s), comma-separated. The Render hostname is added automatically.
+      - key: PRIVARA_ALLOWED_HOSTS
+        value: privara-32np.vercel.app
+      - key: PRIVARA_DEPLOYMENT
+        value: hosted

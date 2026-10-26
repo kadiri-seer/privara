@@ -58,7 +58,20 @@ def cmd_serve(args: argparse.Namespace) -> int:
     if host not in ("127.0.0.1", "localhost", "::1") and not args.allow_remote:
         print("Refusing to bind to a non-loopback address without --allow-remote.", file=sys.stderr)
         return 2
-    uvicorn.run(create_app(settings), host=host, port=args.port or settings.port, log_level=settings.log_level.lower())
+    container = _container()
+    if settings.is_hosted and not container.admin.has_any():
+        print("Hosted mode needs an admin credential: set PRIVARA_ADMIN_API_KEY or run `privara init`.", file=sys.stderr)
+        return 2
+    uvicorn.run(
+        create_app(settings, container),
+        host=host,
+        port=args.port or settings.listen_port,
+        log_level=settings.log_level.lower(),
+        # Behind a hosting platform's HTTPS proxy, trust its X-Forwarded-* headers for scheme and client IP.
+        proxy_headers=settings.is_hosted,
+        forwarded_allow_ips="*" if settings.is_hosted else None,
+        server_header=False,
+    )
     return 0
 
 

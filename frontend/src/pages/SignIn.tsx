@@ -4,7 +4,7 @@ import { Button, ErrorNote, Field, inputClass } from "../components/ui";
 import { useSession } from "../session";
 
 export function SignIn() {
-  const { signIn } = useSession();
+  const { signIn, hosted } = useSession();
   const [key, setKey] = useState("");
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -32,7 +32,15 @@ export function SignIn() {
           Your boundaries.
         </h1>
         <p className="mt-4 text-[15px] leading-relaxed text-muted">
-          Sign in with the admin key printed when you first ran <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-[13px] text-ink">privara init</code>.
+          {hosted ? (
+            <>
+              Sign in with the admin key set as <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-[13px] text-ink">PRIVARA_ADMIN_API_KEY</code> on your server.
+            </>
+          ) : (
+            <>
+              Sign in with the admin key printed when you first ran <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-[13px] text-ink">privara init</code>.
+            </>
+          )}{" "}
           The key stays in this browser tab only.
         </p>
         <form onSubmit={submit} className="mt-8 flex flex-col gap-4">
@@ -60,7 +68,13 @@ export function SignIn() {
           <ProtectionStatus />
         </div>
         <p className="mt-4 text-[12px] text-muted">
-          Lost the key? Run <code className="font-mono">privara admin-key</code> on this machine to issue a new one.
+          {hosted ? (
+            <>Lost the key? It is in your hosting provider’s environment settings for the Privara service.</>
+          ) : (
+            <>
+              Lost the key? Run <code className="font-mono">privara admin-key</code> on this machine to issue a new one.
+            </>
+          )}
         </p>
       </div>
     </div>

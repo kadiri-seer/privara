@@ -9,7 +9,7 @@ interface Integrations {
     openapi: string;
     docs: string;
     mcp_http: string | null;
-    mcp_stdio_command: string[];
+    mcp_stdio_command: string[] | null;
   };
   tools: { name: string; description: string; action: string }[];
   health: Health;
@@ -25,7 +25,8 @@ export function Integrations() {
   }, []);
 
   const a = data?.actual;
-  const [cmd, ...args] = a?.mcp_stdio_command ?? ["uv"];
+  const stdio = a?.mcp_stdio_command ?? null;
+  const [cmd, ...args] = stdio ?? ["uv", "--directory", "/path/to/privara/backend", "run", "privara", "mcp"];
   const stdioConfig = JSON.stringify({ mcpServers: { privara: { command: cmd, args, env: { PRIVARA_AGENT_KEY: KEY } } } }, null, 2);
   const httpConfig = JSON.stringify(
     { mcpServers: { privara: { type: "http", url: a?.mcp_http ?? "http://127.0.0.1:8787/mcp", headers: { Authorization: `Bearer ${KEY}` } } } },
@@ -45,7 +46,22 @@ export function Integrations() {
   -H "Authorization: Bearer ${KEY}" \\
   -H "Content-Type: application/json" \\
   -d '{"action": "file.write", "resource": "sandbox:outbox/report.txt"}'`;
-  const python = `import asyncio, os
+  const pythonHttp = `import asyncio, os
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+
+URL = "${a?.mcp_http ?? "https://your-privara-host/mcp"}"
+HEADERS = {"Authorization": f"Bearer {os.environ['PRIVARA_AGENT_KEY']}"}
+
+async def main():
+    async with streamablehttp_client(URL, headers=HEADERS) as (read, write, _):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool("sanitize_text", {"text": "Email ada@example.com"})
+            print(result.content[0].text)
+
+asyncio.run(main())`;
+  const pythonStdio = `import asyncio, os
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
@@ -80,7 +96,7 @@ asyncio.run(main())`;
         <dl className="grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-[180px_1fr]">
           {[
             ["MCP over HTTP", a?.mcp_http ?? "Disabled"],
-            ["MCP over stdio", a ? a.mcp_stdio_command.join(" ") : "—"],
+            ...(stdio || !a ? [["MCP over stdio", stdio ? stdio.join(" ") : "—"]] : []),
             ["REST base URL", a?.rest_base],
             ["OpenAPI schema", a?.openapi],
           ].map(([label, value]) => (
@@ -106,34 +122,36 @@ asyncio.run(main())`;
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel>
-          <PanelTitle hint="For Claude Desktop, Cursor and other clients that launch MCP servers. Replace the key placeholder.">
-            <span className="inline-flex items-center gap-2">
-              MCP over stdio <Tag>Example</Tag>
-            </span>
-          </PanelTitle>
-          <CodeBlock label="mcp config (JSON)" code={stdioConfig} />
-        </Panel>
+        {a && !stdio ? null : (
+          <Panel>
+            <PanelTitle hint="For Claude Desktop, Cursor and other clients that launch MCP servers. Replace the key placeholder.">
+              <span className="inline-flex items-center gap-2">
+                MCP over stdio <Tag>Template</Tag>
+              </span>
+            </PanelTitle>
+            <CodeBlock label="mcp config (JSON)" code={stdioConfig} />
+          </Panel>
+        )}
         <Panel>
           <PanelTitle hint="For clients that speak streamable HTTP. The key is checked on every call.">
             <span className="inline-flex items-center gap-2">
-              MCP over HTTP <Tag>Example</Tag>
+              MCP over HTTP <Tag>Template</Tag>
             </span>
           </PanelTitle>
           <CodeBlock label="mcp config (JSON)" code={httpConfig} />
         </Panel>
         <Panel>
-          <PanelTitle hint="Uses the official MCP Python SDK. Also in examples/mcp_client.py.">
+          <PanelTitle hint={stdio ? "Uses the official MCP Python SDK. Also in examples/mcp_client.py." : "Uses the official MCP Python SDK over streamable HTTP."}>
             <span className="inline-flex items-center gap-2">
-              Python client <Tag>Example</Tag>
+              Python client <Tag>Template</Tag>
             </span>
           </PanelTitle>
-          <CodeBlock label="python" code={python} />
+          <CodeBlock label="python" code={a && !stdio ? pythonHttp : pythonStdio} />
         </Panel>
         <Panel>
           <PanelTitle hint="Sample REST requests. Status codes: 200 executed, 202 needs approval, 403 denied.">
             <span className="inline-flex items-center gap-2">
-              REST requests <Tag>Example</Tag>
+              REST requests <Tag>Template</Tag>
             </span>
           </PanelTitle>
           <div className="flex flex-col gap-3">

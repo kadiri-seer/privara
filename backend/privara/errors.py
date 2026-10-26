@@ -55,3 +55,8 @@ class ValidationFailed(PrivaraError):
 class PayloadTooLarge(PrivaraError):
     status_code = 413
     code = "payload_too_large"
+
+
+class TooManyRequests(PrivaraError):
+    status_code = 429
+    code = "too_many_attempts"

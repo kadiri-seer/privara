@@ -224,3 +224,12 @@ describe("Agent Access", () => {
     await waitFor(() => expect(calls.some((c) => c.path === "/api/admin/agents/agt_new/revoke")).toBe(true));
   });
 });
+
+describe("hosted deployment", () => {
+  it("tells the operator where the hosted admin key lives", async () => {
+    mockApi({ "GET /api/health": () => ({ ...HEALTH, deployment: "hosted" }) });
+    renderApp("/", { signedIn: false });
+    expect(await screen.findByText("PRIVARA_ADMIN_API_KEY")).toBeInTheDocument();
+    expect(screen.queryByText("privara init")).not.toBeInTheDocument();
+  });
+});

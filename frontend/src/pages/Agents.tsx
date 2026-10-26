@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router";
 import { ApiError, api, type Agent, type AuditEvent, type Policy } from "../api";
+import { useSession } from "../session";
 import {
   Button,
   CodeBlock,
@@ -174,6 +175,7 @@ function AgentDetail({ agentId, onChanged, onSecret }: { agentId: string; onChan
   const [confirm, setConfirm] = useState<"revoke" | "rotate" | null>(null);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
+  const { hosted } = useSession();
 
   const load = useCallback(async () => {
     try {
@@ -291,17 +293,19 @@ function AgentDetail({ agentId, onChanged, onSecret }: { agentId: string; onChan
         <Panel>
           <PanelTitle hint="Use this agent’s key in place of the placeholder. Full options are on the Integrations page.">Connect over MCP</PanelTitle>
           <CodeBlock
-            label="Claude Desktop / MCP client config (example)"
+            label={hosted ? "MCP client config (streamable HTTP)" : "Claude Desktop / MCP client config"}
             code={JSON.stringify(
-              {
-                mcpServers: {
-                  privara: {
-                    command: "uv",
-                    args: ["--directory", "/path/to/privara/backend", "run", "privara", "mcp"],
-                    env: { PRIVARA_AGENT_KEY: `<${agent.name} key>` },
+              hosted
+                ? { mcpServers: { privara: { type: "http", url: `${window.location.origin}/mcp`, headers: { Authorization: `Bearer <${agent.name} key>` } } } }
+                : {
+                    mcpServers: {
+                      privara: {
+                        command: "uv",
+                        args: ["--directory", "/path/to/privara/backend", "run", "privara", "mcp"],
+                        env: { PRIVARA_AGENT_KEY: `<${agent.name} key>` },
+                      },
+                    },
                   },
-                },
-              },
               null,
               2,
             )}

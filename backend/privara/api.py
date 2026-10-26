@@ -25,11 +25,12 @@ from .auth import LAB_AGENT_ID, Agent
 from .config import Settings, get_settings
 from .core import Container, build
 from .demo import reset_demo, run_demo
-from .errors import ForbiddenError, NotFoundError, PayloadTooLarge, PrivaraError, ValidationFailed
+from .errors import AuthenticationError, ForbiddenError, NotFoundError, PayloadTooLarge, PrivaraError, ValidationFailed
 from .mcp_server import build_mcp, http_key_resolver
 from .policy.engine import DECISIONS, KNOWN_ACTIONS, RESOURCE_SCHEMES
 from .privacy.recognizers import ALL_CATEGORIES, CATEGORY_LABELS
 from .security import bearer_from_header
+from .throttle import AuthThrottle
 from .tools.registry import describe_tools
 
 log = logging.getLogger("privara.api")
@@ -224,7 +225,7 @@ class SecurityHeaders:
                     (b"x-content-type-options", b"nosniff"),
                     (b"x-frame-options", b"DENY"),
                     (b"referrer-policy", b"no-referrer"),
-                    (b"cache-control", b"no-store") if path.startswith("/api") else (b"x-privara", b"1"),
+                    (b"cache-control", b"no-store") if path.startswith(("/api", "/mcp")) else (b"x-privara", b"1"),
                 ]
                 if not path.startswith(("/api/docs", "/api/redoc")):
                     headers.append((b"content-security-policy", self.CSP.encode()))
@@ -238,14 +239,21 @@ class MCPEndpoint:
     """Authenticates the bearer key before handing the request to the MCP session manager.
     Each tool call re-authenticates as well, so revocation is immediate even mid-session."""
 
-    def __init__(self, container: Container, mcp):
+    def __init__(self, container: Container, mcp, throttle: AuthThrottle):
         self.container = container
         self.mcp = mcp
+        self.throttle = throttle
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         headers = {k.decode().lower(): v.decode() for k, v in scope.get("headers", [])}
+        client = (scope.get("client") or ("unknown", 0))[0]
         try:
-            self.container.agents.authenticate(bearer_from_header(headers.get("authorization")))
+            self.throttle.check(client)
+            try:
+                self.container.agents.authenticate(bearer_from_header(headers.get("authorization")))
+            except AuthenticationError:
+                self.throttle.record_failure(client)
+                raise
         except PrivaraError as exc:
             response = JSONResponse(exc.to_dict(), status_code=exc.status_code,
                                     headers={"www-authenticate": "Bearer"} if exc.status_code == 401 else None)
@@ -279,7 +287,10 @@ def _file_info(path: Path) -> dict[str, Any]:
 def create_app(settings: Settings | None = None, container: Container | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings.log_level)
+    if settings.is_hosted and settings.admin_api_key and len(settings.admin_api_key.get_secret_value()) < 32:
+        raise SystemExit("PRIVARA_ADMIN_API_KEY must be at least 32 characters when PRIVARA_DEPLOYMENT=hosted.")
     container = container or build(settings)
+    throttle = AuthThrottle(settings.auth_failures_per_minute)
     mcp = build_mcp(container, http_key_resolver, stateless_http=True, json_response=True) if settings.mcp_http_enabled else None
     if mcp is not None:
         mcp.streamable_http_app()  # initialises the session manager
@@ -308,7 +319,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
         lifespan=lifespan,
     )
     app.state.container = container
-    allowed = [h.strip() for h in settings.allowed_hosts.split(",") if h.strip()]
+    allowed = settings.allowed_host_list
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed)
 
     # ---- error handling --------------------------------------------------------------------
@@ -340,11 +351,20 @@ def create_app(settings: Settings | None = None, container: Container | None = N
         return JSONResponse({"error": {"code": "internal_error", "message": "Internal error."}}, status_code=500)
 
     # ---- auth dependencies -----------------------------------------------------------------
+    def throttled(request: Request, authenticate):
+        client = request.client.host if request.client else "unknown"
+        throttle.check(client)
+        try:
+            return authenticate(bearer_from_header(request.headers.get("authorization")))
+        except AuthenticationError:
+            throttle.record_failure(client)
+            raise
+
     def agent_auth(request: Request) -> Agent:
-        return container.agents.authenticate(bearer_from_header(request.headers.get("authorization")))
+        return throttled(request, container.agents.authenticate)
 
     def admin_auth(request: Request) -> str:
-        return container.admin.authenticate(bearer_from_header(request.headers.get("authorization")))
+        return throttled(request, container.admin.authenticate)
 
     def check_claim(agent: Agent, claimed: str | None) -> None:
         if claimed and claimed not in (agent.id, agent.name):
@@ -376,6 +396,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
             "detector": {"mode": detector["mode"], "model": detector["model"], "fallback": bool(detector["fallback_reason"])},
             "default_decision": container.store.get("default_decision"),
             "mcp_http": settings.mcp_http_enabled,
+            "deployment": settings.deployment,
         }
 
     @app.get("/api/health", tags=["public"])
@@ -681,6 +702,9 @@ def create_app(settings: Settings | None = None, container: Container | None = N
     @app.get("/api/admin/integrations", tags=["admin"])
     def integrations(request: Request, _: str = Depends(admin_auth)) -> dict[str, Any]:
         base = str(request.base_url).rstrip("/")
+        forwarded = (request.headers.get("x-forwarded-host") or "").split(",")[0].strip()
+        if settings.is_hosted and forwarded in allowed:
+            base = f"https://{forwarded}"  # the address the browser used, e.g. a Vercel domain
         backend_dir = Path(__file__).resolve().parents[1]
         return {
             "actual": {
@@ -689,7 +713,9 @@ def create_app(settings: Settings | None = None, container: Container | None = N
                 "openapi": f"{base}/api/openapi.json",
                 "docs": f"{base}/api/docs",
                 "mcp_http": f"{base}/mcp" if settings.mcp_http_enabled else None,
-                "mcp_stdio_command": ["uv", "--directory", str(backend_dir), "run", "privara", "mcp"],
+                "mcp_stdio_command": None
+                if settings.is_hosted
+                else ["uv", "--directory", str(backend_dir), "run", "privara", "mcp"],
             },
             "tools": describe_tools(),
             "health": health_payload(),
@@ -697,7 +723,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
 
     # ---- MCP over HTTP ---------------------------------------------------------------------
     if mcp is not None:
-        app.router.routes.append(Route("/mcp", endpoint=MCPEndpoint(container, mcp), methods=["GET", "POST", "DELETE"]))
+        app.router.routes.append(Route("/mcp", endpoint=MCPEndpoint(container, mcp, throttle), methods=["GET", "POST", "DELETE"]))
 
     # ---- dashboard -------------------------------------------------------------------------
     dist = settings.frontend_dist

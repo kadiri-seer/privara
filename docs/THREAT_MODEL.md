@@ -42,6 +42,7 @@ local actions it wants to take. It reduces two risks:
 | Sensitive data leaking into logs, audit or errors | Audit writer accepts whitelisted fields only; validation errors list field names and types, never inputs (FastAPI and MCP SDK defaults both echo input — both are overridden); unhandled errors log the exception type only. Database, audit and log scans in tests. |
 | Revoked agent keeps working | No auth caching; status checked each call; pending approvals expired on revoke. Tested. |
 | Remote access to the local API | Binds to 127.0.0.1; non-loopback requires `--allow-remote`; Host-header allowlist blocks DNS rebinding; no CORS headers are sent. |
+| Key guessing on a hosted deployment | 256-bit keys; bootstrap admin key must be 32+ characters in hosted mode; failed attempts throttled per client address (429). |
 | Clickjacking / XSS in dashboard | CSP `script-src 'self'`, `frame-ancestors 'none'`, `X-Frame-Options: DENY`; React escapes content. |
 | Oversized payloads | Request body cap (Content-Length and streamed), per-field length limits, file size caps. |
 | Privacy tool phoning home | Presidio's public-suffix-list download and spaCy model auto-download are both disabled; the dashboard bundles its font; no telemetry. |
@@ -56,6 +57,8 @@ local actions it wants to take. It reduces two risks:
 - **Detection misses.** Presidio + spaCy is statistical; unredacted values can slip through. Restoration
   and action enforcement do not depend on detection quality, but data minimisation does.
 - **Malicious admin.** The operator is fully trusted.
-- **Denial of service** by a holder of a valid agent key (no rate limiting yet).
+- **Denial of service** by a holder of a valid agent key (only failed sign-ins are throttled).
+- **Hosted deployments** move the trust boundary: raw text crosses the network to your server (and
+  Vercel's edge if you use its URL), and the hosting provider can access the disk. See DEPLOY.md.
 - **Supply chain.** Dependencies are pinned and locked, but not vendored or audited.
 - **TOCTOU in the sandbox** against a concurrent local process manipulating directories.

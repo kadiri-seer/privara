@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, type RestoreResult, type SanitizeResult } from "../api";
+import { useSession } from "../session";
 import {
   Button,
   ConfirmDialog,
@@ -56,6 +57,7 @@ export function PrivacyLab() {
   const [showOriginals, setShowOriginals] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const toast = useToast();
+  const { hosted } = useSession();
 
   useEffect(() => {
     api
@@ -166,7 +168,7 @@ export function PrivacyLab() {
     <>
       <PageHeader
         title="Privacy Lab"
-        description="Paste anything an agent might send out. Privara detects personal and financial details locally and replaces them with placeholders it can reverse only with your approval."
+        description={`Paste anything an agent might send out. Privara detects personal and financial details ${hosted ? "on your Privara server" : "locally"} and replaces them with placeholders it can reverse only with your approval.`}
       />
 
       <Panel className="mb-6">
@@ -234,7 +236,7 @@ export function PrivacyLab() {
         <>
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel>
-              <PanelTitle hint="Highlighted spans were detected. This text never left your machine.">Original</PanelTitle>
+              <PanelTitle hint={hosted ? "Highlighted spans were detected. Processed by your Privara server only, never by an outside model." : "Highlighted spans were detected. This text never left your machine."}>Original</PanelTitle>
               <p className="text-[15px] leading-[1.8] whitespace-pre-wrap" data-testid="original-view">
                 {highlighted}
               </p>
