@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { DecisionBadge, VeiledText } from "../components/ui";
 
-const BEFORE = "Send John Okafor the invoice for ₦250,000 at john@example.com.";
+const BEFORE = "Send John Carter the invoice for $2,500 at john@example.com.";
 const AFTER = "Send [PERSON_1] the invoice for [AMOUNT_1] at [EMAIL_1].";
 
 export function Home() {
@@ -47,7 +47,7 @@ export function Home() {
             reversible mapping on your device and restores original values only when you explicitly authorise it.
           </p>
           <ul className="mt-6 flex flex-col gap-3 text-[14px]">
-            <li className="flex gap-3"><Dot />Names, emails, phone numbers, naira and other amounts, cards, bank accounts, ID numbers, places and links.</li>
+            <li className="flex gap-3"><Dot />Names, emails, phone numbers, money amounts, cards, bank accounts, ID numbers, places and links.</li>
             <li className="flex gap-3"><Dot />The same value always gets the same placeholder within a session, so replies still make sense.</li>
             <li className="flex gap-3"><Dot />Paste a model’s reply back in and restore the real values, after you approve it.</li>
           </ul>

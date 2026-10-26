@@ -26,7 +26,7 @@ export const CATEGORIES: { id: Category; label: string }[] = [
   { id: "IP", label: "IP addresses" },
   { id: "LOCATION", label: "Places and addresses" },
   { id: "URL", label: "Links" },
-  { id: "NATIONAL_ID", label: "ID numbers (NIN, BVN, SSN)" },
+  { id: "NATIONAL_ID", label: "ID numbers (US SSN)" },
   { id: "CRYPTO", label: "Crypto wallets" },
   { id: "DATE", label: "Dates" },
 ];
@@ -86,17 +86,11 @@ function ipv4Valid(s: string): boolean {
   return s.split(".").every((p) => Number(p) <= 255 && String(Number(p)) === p);
 }
 
-function contextBefore(text: string, index: number, words: RegExp, span = 40): boolean {
-  return words.test(text.slice(Math.max(0, index - span), index));
-}
-
-const ID_CONTEXT = /\b(nin|bvn|national id(entification)?|identity number|bank verification|nimc|ssn|social security)\b[^\n]{0,20}$/i;
-
 // ---- pattern rules -------------------------------------------------------------------------
-const CURRENCY_PREFIX = "(?:₦|NGN|N(?=\\d)|US\\$|\\$|USD|€|EUR|£|GBP|KES|GHS|ZAR|R(?=\\d))";
+const CURRENCY_PREFIX = "(?:US\\$|\\$|USD|€|EUR|£|GBP|KES|GHS|ZAR|R(?=\\d))";
 const NUMBER = "\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?";
 const SCALE = "(?:\\s?(?:k|K|m|M|bn|million|billion|thousand))?";
-const CURRENCY_WORD = "(?:naira|NGN|dollars?|USD|euros?|EUR|pounds?|GBP|kobo|cedis?|shillings?)";
+const CURRENCY_WORD = "(?:dollars?|USD|euros?|EUR|pounds?|GBP|cedis?|shillings?)";
 
 const RULES: Rule[] = [
   { category: "EMAIL", name: "email", score: 0.99, pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b/g },
@@ -114,19 +108,6 @@ const RULES: Rule[] = [
   { category: "CRYPTO", name: "eth", score: 0.98, pattern: /\b0x[a-fA-F0-9]{40}\b/g },
   { category: "CRYPTO", name: "btc", score: 0.85, pattern: /\b(?:bc1[a-z0-9]{25,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})\b/g },
   { category: "NATIONAL_ID", name: "ssn", score: 0.85, pattern: /\b\d{3}-\d{2}-\d{4}\b/g },
-  {
-    category: "NATIONAL_ID",
-    name: "nin-bvn",
-    score: 0.9,
-    pattern: /(?<!\d)\d{11}(?!\d)/g,
-    check: (_m, text, i) => contextBefore(text, i, ID_CONTEXT),
-  },
-  {
-    category: "PHONE",
-    name: "ng-phone",
-    score: 0.88,
-    pattern: /(?<![\d+])(?:\+?234[\s-]?|0)[789][01]\d[\s-]?\d{3}[\s-]?\d{4}(?!\d)/g,
-  },
   {
     category: "PHONE",
     name: "intl-phone",
@@ -173,7 +154,7 @@ const LOCATION_RE = new RegExp(
 );
 
 // ---- names ---------------------------------------------------------------------------------
-const TITLE = "(?:Mr|Mrs|Ms|Miss|Dr|Prof|Sir|Chief|Alhaji|Alhaja|Engr|Barr|Pastor|Rev)";
+const TITLE = "(?:Mr|Mrs|Ms|Miss|Dr|Prof|Sir|Pastor|Rev)";
 const CAP = "[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)?";
 const TITLED_NAME = new RegExp(`\\b${TITLE}\\.?\\s+(${CAP}(?:\\s+${CAP}){0,2})`, "g");
 const CAP_RUN = new RegExp(`\\b${CAP}(?:\\s+${CAP}){1,3}\\b`, "g");

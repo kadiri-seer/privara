@@ -8,8 +8,8 @@ export const SEED_FILES: Record<string, string> = {
     "  notes/      readable and writable\n  outbox/     writes need your approval\n  protected/  readable, never writable\n",
   "notes/welcome.txt": "Welcome to Privara. This file is safe to read.\n",
   "notes/client-brief.txt":
-    "Client brief\n\nPrimary contact: Amina Bello, amina.bello@example.org, +234 803 555 0142.\n" +
-    "Budget approved: ₦1,500,000. Kick-off is next Tuesday in Kaduna.\n",
+    "Client brief\n\nPrimary contact: Sarah Mitchell, sarah.mitchell@example.org, +1 415 555 0142.\n" +
+    "Budget approved: $15,000. Kick-off is next Tuesday in London.\n",
   "protected/policy-notice.txt": "Files in protected/ can be read but never written by agents.\n",
 };
 

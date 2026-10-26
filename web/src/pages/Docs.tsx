@@ -52,7 +52,7 @@ export function Docs() {
               <li>Select <strong>Redact</strong>. Copy the redacted version and use it in your prompt, ticket or tool.</li>
             </ol>
             <Example>
-              <p className="text-ink">Send John Okafor the invoice for ₦250,000 at john@example.com.</p>
+              <p className="text-ink">Send John Carter the invoice for $2,500 at john@example.com.</p>
               <p className="mt-2"><VeiledText text="Send [PERSON_1] the invoice for [AMOUNT_1] at [EMAIL_1]." /></p>
             </Example>
             <h3>Sensitivity</h3>
@@ -71,16 +71,16 @@ export function Docs() {
                 </thead>
                 <tbody className="divide-y divide-line bg-panel">
                   {[
-                    ["Person names", "Amina Bello, Dr Ngozi Okonjo-Iweala, “ask Chidi”"],
+                    ["Person names", "Sarah Mitchell, Dr Jane Smith-Taylor, “ask Daniel”"],
                     ["Email addresses", "ada@example.com"],
-                    ["Phone numbers", "0803 123 4567, +234 803 555 0142, +44 20 7946 0958"],
-                    ["Money amounts", "₦250,000, NGN 1,200,000, $45.50, 3,000 naira"],
+                    ["Phone numbers", "(415) 555-0132, +1 415 555 0132, +44 20 7946 0958"],
+                    ["Money amounts", "$2,500, €1,200, £45.50, 3,000 dollars"],
                     ["Payment cards", "Card numbers that pass the Luhn check"],
                     ["Bank accounts (IBAN)", "IBANs with a valid checksum"],
                     ["IP addresses", "10.0.0.12, IPv6 addresses"],
-                    ["Places and addresses", "Lagos, Kaduna, 12 Adeola Odeku Street"],
+                    ["Places and addresses", "London, San Francisco, 221 Baker Street"],
                     ["Links", "https://… and www.… addresses"],
-                    ["ID numbers", "NIN and BVN (when labelled as such), US SSNs"],
+                    ["ID numbers", "US Social Security numbers"],
                     ["Crypto wallets", "Ethereum and Bitcoin addresses"],
                     ["Dates", "Off by default. 12/03/2026, 4 March 2026"],
                   ].map(([c, e]) => (

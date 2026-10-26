@@ -40,7 +40,7 @@ describe("home", () => {
 });
 
 describe("privacy protection", () => {
-  const ORIGINAL = "Send John Okafor the invoice for ₦250,000 at john@example.com.";
+  const ORIGINAL = "Send John Carter the invoice for $2,500 at john@example.com.";
 
   it("redacts, then restores only after explicit approval", async () => {
     renderAt("/privacy");
@@ -50,7 +50,7 @@ describe("privacy protection", () => {
 
     const view = await screen.findByTestId("redacted-view");
     await waitFor(() => expect(view).toHaveTextContent("Send PERSON_1 the invoice for AMOUNT_1 at EMAIL_1."));
-    expect(view).not.toHaveTextContent("Okafor");
+    expect(view).not.toHaveTextContent("Carter");
     expect(within(view).getByText("EMAIL_1")).toHaveClass("veil");
 
     await user.click(screen.getByRole("button", { name: "Use the redacted text" }));
@@ -62,7 +62,7 @@ describe("privacy protection", () => {
     await user.click(within(dialog).getByRole("button", { name: "Approve and reveal" }));
     expect(await screen.findByTestId("restored-text")).toHaveTextContent(ORIGINAL);
     await user.click(screen.getByRole("button", { name: "Hide values" }));
-    expect(screen.getByTestId("restored-text")).not.toHaveTextContent("Okafor");
+    expect(screen.getByTestId("restored-text")).not.toHaveTextContent("Carter");
   });
 
   it("declining keeps the values hidden", async () => {
@@ -75,7 +75,7 @@ describe("privacy protection", () => {
     await user.click(screen.getByRole("button", { name: "Restore values" }));
     await user.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Don’t reveal" }));
     expect(await screen.findByTestId("restore-outcome")).toHaveTextContent("Not restored");
-    expect(screen.getByTestId("restore-outcome")).not.toHaveTextContent("Okafor");
+    expect(screen.getByTestId("restore-outcome")).not.toHaveTextContent("Carter");
   });
 });
 

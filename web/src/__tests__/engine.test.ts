@@ -6,7 +6,7 @@ import { evaluate, globMatch, SEED_POLICIES, validatePolicy } from "../engine/po
 import { resolvePath } from "../engine/sandbox";
 import { MemoryKV } from "../engine/storage";
 
-const SAMPLE = "Send John Okafor the invoice for ₦250,000 at john@example.com.";
+const SAMPLE = "Send John Carter the invoice for $2,500 at john@example.com.";
 const redacted = (text: string, sensitivity: "low" | "medium" | "high" = "medium") => {
   let out = text;
   for (const d of [...detect(text, DEFAULT_CATEGORIES, sensitivity)].reverse()) out = out.slice(0, d.start) + `<${d.category}>` + out.slice(d.end);
@@ -19,18 +19,18 @@ describe("detection", () => {
   });
 
   it.each([
-    ["Call 0803 123 4567 or +234 803 555 0142", ["PHONE", "PHONE"]],
+    ["Call (415) 555-0132 or +44 20 7946 0958", ["PHONE", "PHONE"]],
     ["Card 4111 1111 1111 1111 expires soon", ["CARD"]],
     ["Not a card 4111 1111 1111 1112", []],
     ["IBAN GB82 WEST 1234 5698 7654 32", ["IBAN"]],
     ["Server 10.0.0.12 and 999.1.1.1", ["IP"]],
-    ["My NIN is 12345678901", ["NATIONAL_ID"]],
+    ["My SSN is 123-45-6789", ["NATIONAL_ID"]],
     ["Order 12345678901 shipped", []],
     ["Wallet 0x52908400098527886E0F7030069857D2E4169EE7", ["CRYPTO"]],
-    ["Paid $45.50 and 3,000 naira", ["AMOUNT", "AMOUNT"]],
-    ["She lives at 12 Adeola Odeku Street in Lagos", ["LOCATION", "LOCATION"]],
-    ["Dr Ngozi Okonjo-Iweala spoke", ["PERSON"]],
-    ["Ask Amina about it", ["PERSON"]],
+    ["Paid $45.50 and 3,000 euros", ["AMOUNT", "AMOUNT"]],
+    ["She lives at 221 Baker Street in London", ["LOCATION", "LOCATION"]],
+    ["Dr Jane Smith-Taylor spoke", ["PERSON"]],
+    ["Ask Sarah about it", ["PERSON"]],
     ["Email the Privacy Lab team on Monday", []],
     ["See https://example.com/a?b=1.", ["URL"]],
   ])("%s", (text, expected) => {
@@ -38,11 +38,11 @@ describe("detection", () => {
   });
 
   it("keeps titles visible", () => {
-    expect(redacted("Dr Amina Bello will call")).toBe("Dr <PERSON> will call");
+    expect(redacted("Dr Sarah Mitchell will call")).toBe("Dr <PERSON> will call");
   });
 
   it("sensitivity changes how many names are caught", () => {
-    const text = "Kelechi Nwosu approved it";
+    const text = "Marek Lindqvist approved it";
     expect(detect(text, ["PERSON"], "low")).toHaveLength(0);
     expect(detect(text, ["PERSON"], "high")).toHaveLength(1);
   });
@@ -82,7 +82,7 @@ describe("vault and restore", () => {
     await q.sanitize(SAMPLE, s.id, DEFAULT_CATEGORIES, "medium");
     const stored = JSON.stringify((await kv.entries("sessions")).map(([, v]) => ({ ...(v as object), entries: (v as { entries: { placeholder: string; digest: string }[] }).entries.map((e) => [e.placeholder, e.digest]) })));
     expect(stored).not.toContain("john@example.com");
-    expect(stored).not.toContain("Okafor");
+    expect(stored).not.toContain("Carter");
   });
 
   it("restores only after explicit approval, once", async () => {
@@ -110,7 +110,7 @@ describe("vault and restore", () => {
     await p.sanitize(SAMPLE, s.id, DEFAULT_CATEGORIES, "medium");
     await p.savePolicy({ name: "allow restore", action: "privacy.restore", resource: "*", decision: "allow", priority: 5000, agent: "*" });
     const r = await p.restore("you", "[PERSON_1] [PERSON_9] [EMAIL_1]", s.id);
-    expect(r.text).toBe("John Okafor [PERSON_9] john@example.com");
+    expect(r.text).toBe("John Carter [PERSON_9] john@example.com");
     expect(r.unknown).toBe(1);
   });
 
@@ -185,7 +185,7 @@ describe("tools", () => {
     const s = await p.vault.createSession();
     const r = await p.executeTool("bot", "read_file", { path: "notes/client-brief.txt" }, undefined, { sessionId: s.id });
     expect(r.status).toBe("executed");
-    expect(String(r.result!.content)).not.toContain("amina.bello@example.org");
+    expect(String(r.result!.content)).not.toContain("sarah.mitchell@example.org");
   });
 
   it("approval flow, reuse and substitution", async () => {
@@ -211,11 +211,11 @@ describe("tools", () => {
   });
 
   it("history never stores content", async () => {
-    await p.executeTool("bot", "write_file", { path: "notes/secret.txt", content: "john@example.com owes ₦5,000" });
-    await p.executeTool("bot", "transform_text", { operation: "uppercase", text: "Amina Bello" });
+    await p.executeTool("bot", "write_file", { path: "notes/secret.txt", content: "john@example.com owes $5,000" });
+    await p.executeTool("bot", "transform_text", { operation: "uppercase", text: "Sarah Mitchell" });
     const dump = JSON.stringify(await p.history());
     expect(dump).not.toContain("john@example.com");
-    expect(dump).not.toContain("Amina");
+    expect(dump).not.toContain("Sarah");
     expect(await p.history()).toHaveLength(2);
   });
 

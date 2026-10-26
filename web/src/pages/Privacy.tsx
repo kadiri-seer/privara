@@ -22,7 +22,7 @@ import {
 } from "../components/ui";
 
 const SAMPLE =
-  "Hi Chidi, please send John Okafor the invoice for ₦250,000 at john@example.com. If he doesn't reply by Friday, call him on 0803 123 4567. His office is at 12 Adeola Odeku Street, Lagos.";
+  "Hi Sarah, please send John Carter the invoice for $2,500 at john@example.com. If he doesn't reply by Friday, call him on (415) 555-0132. His office is at 221 Market Street, San Francisco.";
 const AGENT = "you";
 
 interface PendingRestore {
