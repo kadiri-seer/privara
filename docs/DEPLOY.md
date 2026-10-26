@@ -1,86 +1,60 @@
-# Putting the Privara dashboard online
+# Deploying Privara
 
-Two pieces, two hosts:
+This repository contains two things:
 
+| Folder | What it is | Where it runs |
+| --- | --- | --- |
+| `web/` | The public, open-access Privara site. Anyone can redact text, restore it with their own approval, write policies and check tool calls. Everything runs in the visitor's browser. | Vercel (static) |
+| `backend/` + `frontend/` | The self-hosted gateway that agents connect to over MCP or REST, with its own operator dashboard. | Your computer, or your own server |
+
+## The public site on Vercel
+
+`vercel.json` at the repository root builds `web/` and serves `web/dist`. There is nothing to configure
+in Vercel: keep the project's Framework Preset on **Other** and the Root Directory at the repository root.
+Every push to `main` redeploys it.
+
+What the site guarantees:
+
+- **No backend.** Detection, redaction, restore, policies, approvals and the file sandbox all run in the
+  page. The Content-Security-Policy sets `connect-src 'none'`, so the browser itself blocks the page
+  from sending data anywhere.
+- **Visitors' data stays with them.** Sessions, policies, sandbox files and decision history live in the
+  visitor's IndexedDB. Original values are encrypted with an AES-GCM key generated as non-extractable,
+  so even the page's own scripts can't read the key out.
+- **Restoring needs the visitor's explicit approval**, enforced by the same policy, token and binding
+  rules as the gateway.
+- **Nothing about any operator is on it**: no sign-in, no admin key, no agents, no server logs.
+
+Detection on the site uses pattern rules and word lists. The self-hosted gateway adds Presidio with a
+spaCy NER model, which finds more names.
+
+## Publishing with one push
+
+```bash
+./push-to-github.sh https://github.com/<you>/<repo>.git
 ```
-browser / agents ──▶ Vercel  (privara-32np.vercel.app)
-                       ├─ serves the dashboard (frontend/dist)
-                       └─ forwards /api/* and /mcp ──▶ Render  (privara-api.onrender.com)
-                                                         └─ Python server + persistent disk (/var/data)
-```
 
-Vercel can't run the backend: it needs a process that stays up and a disk that survives restarts
-(databases, encrypted vault, sandbox). Render runs it from the `Dockerfile` in this repo.
+It commits the whole project on top of your existing history as a single commit and pushes once. On
+Windows, run it from Git Bash.
 
-## 1. Deploy the backend on Render
+## Self-hosting the gateway
 
-1. Push this project to your GitHub repository in one go:
+Locally (recommended, so text never leaves your machine): `./start.sh`, then open
+<http://127.0.0.1:8787>.
 
-   ```bash
-   ./push-to-github.sh https://github.com/<you>/<repo>.git
-   ```
+On a server: the `Dockerfile` runs the gateway in hosted mode with its data in `/var/data`, and
+`render.yaml` deploys it on Render with a persistent disk (about $7.25 a month at the time of writing;
+Render's free instance has no disk and erases its files whenever it sleeps). The gateway gets its own
+URL, such as `https://privara-api.onrender.com`; it is separate from the public site.
 
-   It commits everything on top of your existing history as a single commit and pushes once
-   (on Windows, run it from Git Bash). Vercel redeploys from that push.
-2. In Render: **New → Blueprint**, choose the repository. Render reads `render.yaml` and creates the
-   `privara-api` web service with a 1 GB disk at `/var/data`, in Frankfurt.
-3. Confirm. The first build takes a few minutes (it installs spaCy and its English model).
-4. When it's live, open the service's **Environment** tab and copy `PRIVARA_ADMIN_API_KEY`. That is
-   your dashboard sign-in key. Render generated it; it is never printed in logs.
-5. Note the service URL at the top, e.g. `https://privara-api.onrender.com`. If Render added a suffix
-   (because the name was taken), you'll need it in step 2.
+Hosted mode (`PRIVARA_DEPLOYMENT=hosted`, set by the Dockerfile):
 
-**Cost.** `render.yaml` uses Render's 512 MB paid instance plus a 1 GB disk (about $7.25 a month at
-the time of writing). Privara uses about 180 MB of RAM at idle, so this size is enough.
+- binds to `0.0.0.0` on the platform's `PORT` and trusts its `X-Forwarded-*` headers;
+- accepts only Host headers in `PRIVARA_ALLOWED_HOSTS` plus the hostname Render announces;
+- requires `PRIVARA_ADMIN_API_KEY` to be at least 32 characters (`render.yaml` generates one — find it
+  in the service's **Environment** tab);
+- answers `429` after 20 failed sign-ins per minute from one address.
 
-Render's free instance can't attach a disk, sleeps after 15 idle minutes, and erases its files every
-time it sleeps or redeploys. To run on it anyway, change `plan: starter` to `plan: free` and delete the
-`disk:` block. Expect registered agents, policies and the audit log to disappear regularly; the admin key
-survives because it lives in an environment variable.
-
-## 2. Point Vercel at it
-
-1. If your Render URL is not exactly `https://privara-api.onrender.com`, edit the two `destination`
-   values in `vercel.json` to match.
-2. If your Vercel domain is not `privara-32np.vercel.app` (or you add a custom domain), list every
-   domain in `PRIVARA_ALLOWED_HOSTS` on Render, comma-separated, then redeploy the Render service.
-3. Push to `main`. Vercel builds `frontend/` (settings come from `vercel.json`, so the project's
-   Framework Preset and Root Directory should stay at their defaults: **Other** and the repo root).
-4. Open `https://privara-32np.vercel.app` and sign in with the key from step 1.4.
-
-## 3. Connect agents
-
-Register an agent under **Agent Access**, then use the HTTP settings shown on **Integrations**:
-
-- MCP: `https://privara-32np.vercel.app/mcp` with `Authorization: Bearer <agent key>`
-- REST: `https://privara-32np.vercel.app/api/v1/…` with the same header
-
-Agents can also use the Render URL directly. stdio MCP isn't available on a hosted server.
-
-## What changes when Privara is hosted
-
-`PRIVARA_DEPLOYMENT=hosted` (set by the Dockerfile) makes the server:
-
-- bind to `0.0.0.0` on the platform's `PORT`, and trust the platform's `X-Forwarded-*` headers for
-  HTTPS and the visitor's IP;
-- accept only Host headers from `PRIVARA_ALLOWED_HOSTS` plus the hostname Render announces;
-- refuse to start with a `PRIVARA_ADMIN_API_KEY` shorter than 32 characters;
-- answer `429` after 20 failed sign-ins per minute from one address;
-- describe itself correctly in the dashboard (text is processed on your server, not "on your machine").
-
-Responses are marked `Cache-Control: no-store`, and `vercel.json` also turns off Vercel's rewrite
-caching for `/api` and `/mcp`, so nothing sensitive is cached at the edge.
-
-## Trade-offs to be aware of
-
-- **The privacy boundary moves.** Locally, text never leaves your computer. Hosted, the Privacy Lab and
-  agents send raw text over HTTPS to your server, and through Vercel's edge when you use the Vercel URL.
-  Use the Render URL directly if you don't want Vercel in that path.
-- **The sandbox is on the server.** `read_file` and `write_file` work on `/var/data/sandbox`, not on
-  your laptop. Agents running on your own computer that need local file protection should use a local
-  Privara instead.
-- **Anyone who can reach the URL can try to sign in.** Keys are 256-bit random values and failed
-  attempts are throttled, but keep the admin key private and rotate it if it leaks (Settings → Rotate
-  admin key, or regenerate the variable in Render and redeploy).
-- **Backups.** Check your Render disk's snapshot and backup options. Back up the whole `/var/data`
-  directory together: the vault can't be read without `vault.key`.
+Trade-offs of hosting the gateway: agents' text crosses the network to your server, the sandbox lives on
+the server rather than your computer, and the hosting provider can access the disk. Back up `/var/data`
+as a whole — the vault can't be read without `vault.key`.

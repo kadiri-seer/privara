@@ -15,6 +15,13 @@ Privara is a local, open-source privacy and action firewall for AI agents. Agent
 
 Everything runs locally: no paid APIs, no cloud account, no LLM required.
 
+**Two ways to use it**
+
+- **The open-access web app** (`web/`): anyone can use both protections in their browser, with no
+  account and no server. It is what the Vercel deployment serves.
+- **The self-hosted gateway** (`backend/` + `frontend/`): what your agents connect to over MCP or REST,
+  with per-agent keys, an operator dashboard and the stronger Presidio + spaCy detector.
+
 ```
  Agent (Claude Desktop, Cursor, your code)
    │  MCP (stdio or HTTP)  /  REST
@@ -43,9 +50,12 @@ sign-in screen. Lost it? `uv --directory backend run privara admin-key` issues a
 Then, in the dashboard: **Overview → Run the demo** to watch a built-in agent exercise every rule over
 MCP, and **Privacy Lab** to sanitize your own text.
 
-**Putting it online:** the dashboard can be served from Vercel with the backend on Render (Docker +
-persistent disk). `./push-to-github.sh <repo-url>` publishes the project in a single commit and push.
-See [docs/DEPLOY.md](docs/DEPLOY.md).
+**Online:** Vercel serves the open-access web app from `web/` (no backend). The gateway can also run on
+your own server via Docker. `./push-to-github.sh <repo-url>` publishes the project in a single commit
+and push. See [docs/DEPLOY.md](docs/DEPLOY.md).
+
+**Web app development:** `cd web && npm ci && npm run dev`, then open <http://127.0.0.1:5174>.
+Tests: `npm test` (54 tests, including a check that the page never calls the network).
 
 <details>
 <summary>Manual setup (without start.sh, e.g. on Windows)</summary>
@@ -159,7 +169,8 @@ backend/privara/
   api.py        FastAPI app, middleware, error format, dashboard hosting
   demo.py       built-in demo agent
 backend/tests/  100 tests: privacy, policy, gateway security, REST, MCP, hosted mode
-frontend/       React + TypeScript + Vite + Tailwind dashboard (vitest tests in src/__tests__)
+frontend/       React + TypeScript + Vite + Tailwind operator dashboard for the gateway
+web/            the open-access web app: in-browser engine (src/engine) and pages
 docs/           THREAT_MODEL.md, API.md, MCP.md, DEPLOY.md
 Dockerfile, render.yaml, vercel.json   hosted deployment (see docs/DEPLOY.md)
 examples/       MCP client, client config, REST walkthrough

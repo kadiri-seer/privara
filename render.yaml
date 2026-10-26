@@ -22,8 +22,8 @@ services:
       # Render generates a random 256-bit value. Read it under Environment to sign in to the dashboard.
       - key: PRIVARA_ADMIN_API_KEY
         generateValue: true
-      # Your Vercel domain(s), comma-separated. The Render hostname is added automatically.
+      # Extra hostnames (e.g. a custom domain), comma-separated. The Render hostname is added automatically.
       - key: PRIVARA_ALLOWED_HOSTS
-        value: privara-32np.vercel.app
+        value: localhost
       - key: PRIVARA_DEPLOYMENT
         value: hosted

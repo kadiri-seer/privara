@@ -30,6 +30,7 @@ git -C "$WORK/repo" rm -r -q --ignore-unmatch . >/dev/null
 tar -C "$SRC" \
   --exclude=./.git --exclude=./data --exclude=./.env \
   --exclude=./backend/.venv --exclude=./frontend/node_modules --exclude=./frontend/dist \
+  --exclude=./web/node_modules --exclude=./web/dist \
   --exclude='__pycache__' --exclude='.pytest_cache' --exclude='*.tsbuildinfo' \
   -cf - . | tar -C "$WORK/repo" -xf -
 
@@ -40,7 +41,7 @@ if git diff --cached --quiet; then
   exit 0
 fi
 git -c user.name="$(git config user.name || echo Privara)" -c user.email="$(git config user.email || echo privara@localhost)" \
-  commit --quiet -m "Privara: privacy and action firewall for AI agents (dashboard on Vercel, server on Render)"
+  commit --quiet -m "Privara: open-access web app and self-hosted gateway"
 echo "› Pushing one commit to $BRANCH…"
 git push --quiet origin "HEAD:$BRANCH"
 echo "Done. Vercel will redeploy from this push."
