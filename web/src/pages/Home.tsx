@@ -78,7 +78,7 @@ export function Home() {
         <dl className="mt-8 grid gap-8 md:grid-cols-3">
           <div>
             <dt className="text-[15px] font-medium">No server sees your text</dt>
-            <dd className="mt-2 text-[14px] leading-relaxed text-muted">Detection, redaction and policy checks run in this page. It makes no network requests after loading.</dd>
+            <dd className="mt-2 text-[14px] leading-relaxed text-muted">Detection, redaction and policy checks run in this page. The tools never send anything over the network.</dd>
           </div>
           <div>
             <dt className="text-[15px] font-medium">Mappings are encrypted on your device</dt>
@@ -91,6 +91,20 @@ export function Home() {
         </dl>
       </section>
 
+
+      <section className="border-t border-line py-16">
+        <div className="flex flex-col gap-6 rounded-[28px] bg-ink p-8 text-white sm:p-10 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-xl">
+            <h2 className="text-[28px] font-semibold tracking-[-0.025em]">Building an agent that acts on its own?</h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-zinc-300">
+              Put Privara between your agent and its tools. We’re opening the gateway to a small group of teams first.
+            </p>
+          </div>
+          <Link to="/early-access" className="inline-flex h-11 shrink-0 items-center self-start rounded-full bg-white px-6 text-[15px] font-medium text-ink hover:bg-zinc-200 md:self-auto">
+            Apply for early access
+          </Link>
+        </div>
+      </section>
     </>
   );
 }

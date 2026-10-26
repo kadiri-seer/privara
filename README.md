@@ -171,6 +171,7 @@ backend/privara/
 backend/tests/  100 tests: privacy, policy, gateway security, REST, MCP, hosted mode
 frontend/       React + TypeScript + Vite + Tailwind operator dashboard for the gateway
 web/            the open-access web app: in-browser engine (src/engine) and pages
+api/            Vercel function for early access applications (forwards to Telegram/webhook)
 docs/           THREAT_MODEL.md, API.md, MCP.md, DEPLOY.md
 Dockerfile, render.yaml, vercel.json   hosted deployment (see docs/DEPLOY.md)
 examples/       MCP client, client config, REST walkthrough

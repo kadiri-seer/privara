@@ -15,9 +15,9 @@ Every push to `main` redeploys it.
 
 What the site guarantees:
 
-- **No backend.** Detection, redaction, restore, policies, approvals and the file sandbox all run in the
-  page. The Content-Security-Policy sets `connect-src 'none'`, so the browser itself blocks the page
-  from sending data anywhere.
+- **No backend for the tools.** Detection, redaction, restore, policies, approvals and the file sandbox
+  all run in the page and never make network requests (enforced by tests). The Content-Security-Policy
+  allows connections only to the site itself (`connect-src 'self'`), which the early access form needs.
 - **Visitors' data stays with them.** Sessions, policies, sandbox files and decision history live in the
   visitor's IndexedDB. Original values are encrypted with an AES-GCM key generated as non-extractable,
   so even the page's own scripts can't read the key out.
@@ -27,6 +27,21 @@ What the site guarantees:
 
 Detection on the site uses pattern rules and word lists. The self-hosted gateway adds Presidio with a
 spaCy NER model, which finds more names.
+
+## Early access applications
+
+The **Early access** page posts applications to `api/apply.js`, a Vercel serverless function that
+validates them, filters obvious spam, and forwards each one. It stores nothing. Set at least one
+destination in Vercel → Project → **Settings → Environment Variables**, then redeploy:
+
+| Variable | What it does |
+| --- | --- |
+| `TELEGRAM_BOT_TOKEN` | Token of a bot created with [@BotFather](https://t.me/BotFather). |
+| `TELEGRAM_CHAT_ID` | Where the bot posts: your chat, group or channel id (the bot must be a member). |
+| `APPLY_WEBHOOK_URL` | Optional. Any webhook (Zapier, Make, Slack, Discord…) that should also receive each application as JSON. |
+
+Until one is set, the form tells applicants that applications aren't open yet and points them to
+Telegram and X.
 
 ## Publishing with one push
 

@@ -1,25 +1,25 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useEngine } from "../engine-context";
+import { LogoMark } from "./Logo";
 import { cx } from "./ui";
+
+export const X_URL = "https://x.com/privaraa_";
+export const TELEGRAM_URL = "https://t.me/privaratech";
 
 export function Wordmark() {
   return (
     <span className="inline-flex items-center gap-2.5">
-      <svg viewBox="0 0 32 32" className="size-7" aria-hidden>
-        <rect width="32" height="32" rx="9" fill="#18181B" />
-        <rect x="7" y="9" width="18" height="4" rx="2" fill="#B9B0F5" />
-        <rect x="7" y="15" width="12" height="4" rx="2" fill="#FAFAF8" />
-        <rect x="7" y="21" width="15" height="4" rx="2" fill="#B9B0F5" opacity=".6" />
-      </svg>
+      <LogoMark />
       <span className="text-[17px] font-semibold tracking-[-0.02em]">Privara</span>
     </span>
   );
 }
 
 const LINKS = [
-  { to: "/privacy", label: "Privacy protection" },
-  { to: "/actions", label: "Action protection" },
+  { to: "/privacy", label: "Privacy" },
+  { to: "/actions", label: "Actions" },
+  { to: "/docs", label: "Docs" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -65,6 +65,24 @@ export function Shell({ children }: { children: ReactNode }) {
                 {l.label}
               </NavLink>
             ))}
+            <a href={X_URL} target="_blank" rel="noopener noreferrer" className="rounded-full px-3.5 py-2 text-[14px] text-ink-soft hover:bg-sunken hover:text-ink">
+              X
+            </a>
+            <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" className="rounded-full px-3.5 py-2 text-[14px] text-ink-soft hover:bg-sunken hover:text-ink">
+              Telegram
+            </a>
+            <NavLink
+              to="/early-access"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) =>
+                cx(
+                  "mt-2 inline-flex h-9 items-center justify-center rounded-full px-4 text-[14px] font-medium transition-colors md:mt-0 md:ml-2",
+                  isActive ? "bg-veil-deep text-white" : "bg-veil text-white hover:bg-veil-deep",
+                )
+              }
+            >
+              Get early access
+            </NavLink>
           </nav>
         </div>
       </header>
@@ -77,8 +95,16 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
       <footer className="border-t border-line">
-        <div className="mx-auto max-w-[1160px] px-4 py-6 text-[13px] text-muted sm:px-8">
-          <p>Privara runs entirely in your browser. Nothing you enter is sent anywhere.</p>
+        <div className="mx-auto flex max-w-[1160px] flex-col gap-2 px-4 py-6 text-[13px] text-muted sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <p>The privacy and action tools run entirely in your browser. Nothing you enter in them is sent anywhere.</p>
+          <div className="flex gap-4">
+            <a href={X_URL} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
+              @privaraa_ on X
+            </a>
+            <a href={TELEGRAM_URL} target="_blank" rel="noopener noreferrer" className="hover:text-ink">
+              Telegram
+            </a>
+          </div>
         </div>
       </footer>
     </div>

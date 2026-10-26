@@ -13,7 +13,8 @@ beforeEach(() => {
   Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
 });
 afterEach(() => {
-  expect(fetchSpy).not.toHaveBeenCalled(); // the page must never talk to a network
+  // The privacy and action tools must never talk to a network. Only the early access form may.
+  expect(fetchSpy.mock.calls.filter(([url]) => url !== "/api/apply")).toHaveLength(0);
   vi.unstubAllGlobals();
 });
 
@@ -118,5 +119,52 @@ describe("action protection", () => {
     await user.click(within(dialog).getByRole("button", { name: "Create policy" }));
     expect(await screen.findByText("Policy created. It applies to the next call.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Block notes for my-agent" })).toBeInTheDocument();
+  });
+});
+
+describe("docs and early access", () => {
+  it("docs render with a table of contents", async () => {
+    renderAt("/docs");
+    expect(await screen.findByRole("heading", { level: 1, name: "Docs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "How decisions are made" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Approvals" }).length).toBeGreaterThan(0);
+  });
+
+  it("validates the application locally, then submits it once", async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    renderAt("/early-access");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Submit application" }));
+    expect(await screen.findByText("Tell us the name of your agent or product.")).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Agent or product name"), "Ledgerly");
+    await user.type(screen.getByLabelText("What does it do on its own?"), "Reconciles invoices and pays suppliers automatically.");
+    await user.selectOptions(screen.getByLabelText("What kind of agent is it?"), "Trading or finance agent");
+    await user.click(screen.getByRole("button", { name: "Moves money or trades" }));
+    await user.type(screen.getByLabelText("Your name"), "Ada Obi");
+    await user.type(screen.getByLabelText("Email"), "ada@ledgerly.example");
+    await user.click(screen.getByLabelText(/Privara may contact me/));
+    await user.click(screen.getByRole("button", { name: "Submit application" }));
+
+    expect(await screen.findByRole("heading", { name: "Application received" })).toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/api/apply");
+    expect(JSON.parse(init.body)).toMatchObject({ product: "Ledgerly", actions: ["Moves money or trades"], consent: true, company_fax: "" });
+  });
+
+  it("shows server-side errors such as applications not being open", async () => {
+    fetchSpy.mockResolvedValue(new Response(JSON.stringify({ error: { code: "not_configured", message: "Applications aren't being accepted yet." } }), { status: 503 }));
+    renderAt("/early-access");
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText("Agent or product name"), "Ledgerly");
+    await user.type(screen.getByLabelText("What does it do on its own?"), "Reconciles invoices and pays suppliers automatically.");
+    await user.selectOptions(screen.getByLabelText("What kind of agent is it?"), "Coding agent");
+    await user.type(screen.getByLabelText("Your name"), "Ada Obi");
+    await user.type(screen.getByLabelText("Email"), "ada@ledgerly.example");
+    await user.click(screen.getByLabelText(/Privara may contact me/));
+    await user.click(screen.getByRole("button", { name: "Submit application" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Applications aren't being accepted yet.");
   });
 });
