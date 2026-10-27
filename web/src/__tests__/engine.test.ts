@@ -33,8 +33,22 @@ describe("detection", () => {
     ["Ask Sarah about it", ["PERSON"]],
     ["Email the Privacy Lab team on Monday", []],
     ["See https://example.com/a?b=1.", ["URL"]],
+    ["Revenue was €1.2 million last year", ["AMOUNT"]],
+    ["Call 07700 900123 today", ["PHONE"]],
+    ["To: Lisa Wong <lisa@example.com>", ["PERSON", "EMAIL"]],
+    ['{"name": "Tom Hardy"}', ["PERSON"]],
+    ["Contact Support Team on Monday", []],
+    ["Thanks, Dave", ["PERSON"]],
+    ["Remind John Carter today", ["PERSON"]],
+    ["Bill to: Jane Doe", ["PERSON"]],
+    ["Mark the date. Hi Grace, see you", ["PERSON"]],
   ])("%s", (text, expected) => {
     expect(detect(text).map((d) => d.category)).toEqual(expected);
+  });
+
+  it("never runs an amount or a name across a line break", () => {
+    expect(redacted("Jane Doe,$120.00\nMark Lee,$80")).toBe("<PERSON>,<AMOUNT>\n<PERSON>,<AMOUNT>");
+    expect(redacted("Best regards,\nEmily Watson\nHR Manager")).toBe("Best regards,\n<PERSON>\nHR Manager");
   });
 
   it("keeps titles visible", () => {

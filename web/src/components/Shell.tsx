@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router";
 import { useEngine } from "../engine-context";
 import { LogoMark } from "./Logo";
@@ -26,6 +26,19 @@ export function Shell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const engine = useEngine();
+  useEffect(() => {
+    // New page: start at the top, or at the section the link points to.
+    const frame = requestAnimationFrame(() => {
+      const target = location.hash ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+      try {
+        if (target) target.scrollIntoView({ block: "start" });
+        else window.scrollTo(0, 0);
+      } catch {
+        /* not available in every environment */
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [location.pathname, location.hash]);
   return (
     <div className="flex min-h-screen flex-col">
       <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-white">

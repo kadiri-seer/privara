@@ -5,6 +5,7 @@ import { CodeBlock, DecisionBadge, PageHeader, VeiledText } from "../components/
 const TOC = [
   { id: "overview", label: "Overview" },
   { id: "redacting", label: "Redacting text" },
+  { id: "documents", label: "Redacting documents" },
   { id: "detected", label: "What gets detected" },
   { id: "sessions", label: "Sessions and placeholders" },
   { id: "restoring", label: "Restoring values" },
@@ -63,6 +64,34 @@ export function Docs() {
             </ul>
           </Section>
 
+          <Section id="documents" title="Redacting documents">
+            <p>Select <strong>Upload a document</strong> on <Link to="/privacy">Privacy</Link>, or drop a file onto the box. Privara reads it in your browser, puts its text in the box, and you redact it like any other text. The file is never uploaded anywhere.</p>
+            <div className="not-prose overflow-x-auto rounded-2xl ring-1 ring-line">
+              <table className="w-full min-w-[520px] text-left text-[14px]">
+                <thead className="bg-sunken text-[13px] text-muted">
+                  <tr><th scope="col" className="px-4 py-2.5 font-medium">You upload</th><th scope="col" className="px-4 py-2.5 font-medium">What’s read</th><th scope="col" className="px-4 py-2.5 font-medium">You can download</th></tr>
+                </thead>
+                <tbody className="divide-y divide-line bg-panel">
+                  {[
+                    ["PDF (.pdf)", "The text on every page", ".txt or .docx"],
+                    ["Word (.docx)", "Paragraphs and tables", ".docx or .txt"],
+                    ["Excel (.xlsx)", "Every sheet, one row per line", ".txt or .docx"],
+                    ["PowerPoint (.pptx)", "The text on every slide", ".txt or .docx"],
+                    ["Text, Markdown, CSV, JSON, HTML, email and similar", "The file as it is", "The same format, or .txt"],
+                  ].map(([a, b, c]) => (
+                    <tr key={a}><td className="px-4 py-2.5 font-medium text-ink">{a}</td><td className="px-4 py-2.5">{b}</td><td className="px-4 py-2.5">{c}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ul>
+              <li>Files can be up to 15 MB. Only the first 500,000 characters are read.</li>
+              <li>Downloads keep the text and line breaks, not the original layout, fonts or images.</li>
+              <li>Scanned PDFs are pictures of text, so there’s nothing to read. Older <code>.doc</code>, <code>.xls</code> and <code>.ppt</code> files need saving as <code>.docx</code>, <code>.xlsx</code> or <code>.pptx</code> first.</li>
+              <li>To get the real values back into a document, upload the redacted file (or the model’s answer) under <strong>Restore original values</strong>, approve, and download the result.</li>
+            </ul>
+          </Section>
+
           <Section id="detected" title="What gets detected">
             <div className="not-prose overflow-x-auto rounded-2xl ring-1 ring-line">
               <table className="w-full min-w-[520px] text-left text-[14px]">
@@ -98,7 +127,7 @@ export function Docs() {
           </Section>
 
           <Section id="restoring" title="Restoring values">
-            <p>Paste text that contains placeholders, such as a model’s answer, into <strong>Restore original values</strong> and select <strong>Restore values</strong>. Privara shows how many values would be revealed and asks you to approve.</p>
+            <p>Paste text that contains placeholders, such as a model’s answer, into <strong>Restore original values</strong>, or upload a file with <strong>Upload a file</strong>, and select <strong>Restore values</strong>. Privara shows how many values would be revealed and asks you to approve.</p>
             <ul>
               <li>Each approval works once, for exactly that text.</li>
               <li>Only placeholders from the selected session are restored. Anything else is left as it is.</li>
@@ -162,6 +191,7 @@ export function Docs() {
 
           <Section id="sandbox" title="Sandbox and history">
             <p>Tools work on a small set of files stored in your browser: <code>notes/</code> (read and write), <code>outbox/</code> (writes need approval) and <code>protected/</code> (read-only). Select a file to view it, or <strong>Reset</strong> to restore the starter files.</p>
+            <p><strong>Add a file</strong> puts one of your own documents into <code>notes/</code>, in any format the privacy tool reads. Privara then sets up a <code>read_file</code> call for it, so you can see exactly what an agent would get back: the contents with personal details redacted.</p>
             <p><strong>Decision history</strong> lists the last 300 decisions with the agent, action, resource and outcome. It never records file contents or personal values.</p>
           </Section>
 

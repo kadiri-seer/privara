@@ -82,30 +82,76 @@ function telegramText(d) {
     .join("\n");
 }
 
-async function deliver(d, env, fetchImpl) {
-  const jobs = [];
-  if (env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) {
-    jobs.push(
-      fetchImpl(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text: telegramText(d), parse_mode: "HTML", disable_web_page_preview: true }),
-      }),
-    );
+/** Destinations from the environment, forgiving the usual copy-and-paste slips. */
+function destinations(env) {
+  const token = String(env.TELEGRAM_BOT_TOKEN || "").trim().replace(/^bot/i, "");
+  const chatId = String(env.TELEGRAM_CHAT_ID || "").trim().replace(/^["']|["']$/g, "");
+  const webhook = String(env.APPLY_WEBHOOK_URL || "").trim();
+  return { telegram: token && chatId ? { token, chatId } : null, webhook: /^https:\/\//i.test(webhook) ? webhook : null };
+}
+
+const TIMEOUT_MS = 8000;
+function withTimeout() {
+  return typeof AbortSignal !== "undefined" && AbortSignal.timeout ? AbortSignal.timeout(TIMEOUT_MS) : undefined;
+}
+
+async function sendTelegram({ token, chatId }, text, fetchImpl) {
+  const post = (chat_id) =>
+    fetchImpl(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id, text, parse_mode: "HTML", disable_web_page_preview: true }),
+      signal: withTimeout(),
+    });
+  let res = await post(chatId);
+  if (res.ok) return true;
+  let info = {};
+  try {
+    info = await res.json();
+  } catch {
+    /* not JSON */
   }
-  if (env.APPLY_WEBHOOK_URL) {
+  // A group that became a supergroup gets a new id; Telegram says which.
+  const migrated = info && info.parameters && info.parameters.migrate_to_chat_id;
+  if (migrated) {
+    console.warn(`[apply] Telegram chat moved to ${migrated}. Update TELEGRAM_CHAT_ID in Vercel to this value.`);
+    res = await post(migrated);
+    if (res.ok) return true;
+  }
+  console.error(`[apply] Telegram rejected the message (${res.status}): ${(info && info.description) || "no description"}. ${telegramHint(res.status, info)}`);
+  return false;
+}
+
+function telegramHint(status, info) {
+  const d = String((info && info.description) || "").toLowerCase();
+  if (status === 401 || d.includes("unauthorized")) return "Check TELEGRAM_BOT_TOKEN: copy it again from @BotFather.";
+  if (d.includes("chat not found")) return "Check TELEGRAM_CHAT_ID, and make sure you pressed Start in the bot's chat (or added the bot to the group).";
+  if (d.includes("blocked") || d.includes("kicked")) return "The bot was blocked or removed from the chat. Unblock it or add it back.";
+  if (d.includes("not enough rights") || d.includes("administrator")) return "In a channel, the bot must be an administrator that can post messages.";
+  return "";
+}
+
+async function deliver(d, env, fetchImpl) {
+  const dest = destinations(env);
+  const jobs = [];
+  if (dest.telegram) jobs.push(sendTelegram(dest.telegram, telegramText(d), fetchImpl));
+  if (dest.webhook) {
     jobs.push(
-      fetchImpl(env.APPLY_WEBHOOK_URL, {
+      fetchImpl(dest.webhook, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ type: "privara.early_access_application", submitted_at: new Date().toISOString(), ...d }),
+        signal: withTimeout(),
+      }).then((res) => {
+        if (!res.ok) console.error(`[apply] Webhook answered ${res.status}.`);
+        return res.ok;
       }),
     );
   }
   if (!jobs.length) return "not_configured";
   const results = await Promise.allSettled(jobs);
-  const ok = results.some((r) => r.status === "fulfilled" && r.value.ok);
-  return ok ? "delivered" : "failed";
+  for (const r of results) if (r.status === "rejected") console.error(`[apply] Delivery failed: ${r.reason && r.reason.name === "TimeoutError" ? "timed out" : (r.reason && r.reason.message) || r.reason}`);
+  return results.some((r) => r.status === "fulfilled" && r.value === true) ? "delivered" : "failed";
 }
 
 function send(res, status, body) {
@@ -129,6 +175,12 @@ async function readBody(req) {
 }
 
 async function handler(req, res, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+  if (req.method === "GET") {
+    // A quick way to check the setup after deploying: open /api/apply in a browser. Reveals no ids or tokens.
+    const dest = destinations(env);
+    const configured = [dest.telegram && "telegram", dest.webhook && "webhook"].filter(Boolean);
+    return send(res, 200, { accepting_applications: configured.length > 0, destinations: configured });
+  }
   if (req.method !== "POST") return send(res, 405, { error: { code: "method_not_allowed", message: "Use POST." } });
   let body;
   try {

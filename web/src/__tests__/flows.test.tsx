@@ -38,6 +38,14 @@ describe("home", () => {
     expect(screen.queryByLabelText(/key/i)).not.toBeInTheDocument();
   });
 
+  it("lists every tool, including document redaction", async () => {
+    renderAt("/");
+    const features = (await screen.findByRole("heading", { name: "Everything you can do here" })).closest("section")!;
+    expect(within(features).getAllByRole("link")).toHaveLength(8);
+    expect(within(features).getByRole("link", { name: /Redact documents/ })).toHaveAttribute("href", "/privacy");
+    expect(screen.getByRole("link", { name: /Redact whole documents/ })).toBeInTheDocument();
+  });
+
   it("shows the token contract address with a copy button", async () => {
     renderAt("/");
     const user = userEvent.setup();
@@ -72,6 +80,29 @@ describe("privacy protection", () => {
     expect(await screen.findByTestId("restored-text")).toHaveTextContent(ORIGINAL);
     await user.click(screen.getByRole("button", { name: "Hide values" }));
     expect(screen.getByTestId("restored-text")).not.toHaveTextContent("Carter");
+  });
+
+  it("reads an uploaded document, redacts it and offers it as a download in its own format", async () => {
+    const created: Blob[] = [];
+    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: (b: Blob) => (created.push(b), "blob:x"), revokeObjectURL: () => {} }));
+    renderAt("/privacy");
+    const user = userEvent.setup();
+    const file = new File(["Name,Email\nJane Doe,jane@doe.com\n"], "people.csv", { type: "text/csv" });
+    await user.upload(await screen.findByLabelText("Upload a document"), file);
+    expect(await screen.findByTestId("document-chip")).toHaveTextContent("people.csv");
+    expect(screen.getByLabelText("Text to redact")).toHaveValue("Name,Email\nJane Doe,jane@doe.com");
+    await user.click(screen.getByRole("button", { name: "Redact" }));
+    await waitFor(() => expect(screen.getByTestId("redacted-view")).toHaveTextContent("PERSON_1,EMAIL_1"));
+    await user.click(screen.getByRole("button", { name: "Download as .csv" }));
+    expect(created).toHaveLength(1);
+    expect(created[0].type).toBe("text/csv;charset=utf-8");
+  });
+
+  it("explains files it can't read", async () => {
+    renderAt("/privacy");
+    const user = userEvent.setup({ applyAccept: false });
+    await user.upload(await screen.findByLabelText("Upload a document"), new File(["x"], "scan.png"));
+    expect(await screen.findByRole("alert")).toHaveTextContent(".png files aren’t supported");
   });
 
   it("declining keeps the values hidden", async () => {
@@ -110,6 +141,19 @@ describe("action protection", () => {
 
     const history = screen.getByRole("heading", { name: "Decision history" }).closest("section")!;
     await waitFor(() => expect(within(history).getAllByRole("listitem").length).toBeGreaterThanOrEqual(3));
+  });
+
+  it("adds an uploaded file to the sandbox and reads it back redacted", async () => {
+    renderAt("/actions");
+    const user = userEvent.setup();
+    const file = new File(["Contract for Sarah Mitchell, sarah@example.org"], "Contract (v2).md");
+    await user.upload(await screen.findByLabelText("Add a file"), file);
+    expect(await screen.findByText("notes/Contract-v2.md")).toBeInTheDocument();
+    expect(screen.getByLabelText("Path")).toHaveValue("notes/Contract-v2.md");
+    await user.click(screen.getByRole("button", { name: "Run through Privara" }));
+    const outcome = await screen.findByTestId("tool-outcome");
+    await waitFor(() => expect(outcome).toHaveTextContent("Contract for PERSON_1, EMAIL_1"));
+    expect(outcome).not.toHaveTextContent("Mitchell");
   });
 
   it("validates and saves a new policy", async () => {

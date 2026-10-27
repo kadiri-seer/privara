@@ -60,9 +60,9 @@ export function Spinner() {
   );
 }
 
-export function Panel({ children, className, padded = true }: { children: ReactNode; className?: string; padded?: boolean }) {
+export function Panel({ children, className, padded = true, id }: { children: ReactNode; className?: string; padded?: boolean; id?: string }) {
   return (
-    <section className={cx("rounded-[var(--radius-panel)] bg-panel ring-1 ring-line shadow-[var(--shadow-panel)]", padded && "p-6", className)}>
+    <section id={id} className={cx("scroll-mt-24", "rounded-[var(--radius-panel)] bg-panel ring-1 ring-line shadow-[var(--shadow-panel)]", padded && "p-6", className)}>
       {children}
     </section>
   );

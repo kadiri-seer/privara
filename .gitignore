@@ -1,0 +1,21 @@
+# Local data — contains the audit log, encrypted vault and vault key
+/data/
+.env
+
+# Python
+backend/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+web/node_modules/
+web/dist/
+*.tsbuildinfo
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

@@ -26,13 +26,18 @@ export function Home() {
           Privara keeps personal details out of what you send to AI models, and puts your rules in front of what AI agents
           are allowed to do. It runs in your browser: nothing you type here leaves your device.
         </p>
+        <Link to="/privacy" className="mt-5 inline-flex items-center gap-2 rounded-full bg-veil-wash py-1 pr-3 pl-1 text-[13px] text-veil-deep ring-1 ring-veil-line ring-inset hover:bg-panel">
+          <span className="rounded-full bg-veil px-2 py-0.5 text-[11px] font-semibold tracking-wide text-white uppercase">New</span>
+          Redact whole documents: PDF, Word, Excel and PowerPoint
+          <span aria-hidden>→</span>
+        </Link>
         <div className="mt-10 rounded-[28px] bg-panel p-6 ring-1 ring-line shadow-[var(--shadow-panel)] sm:p-8">
           <p className="text-[19px] leading-[1.8] sm:text-[22px]" aria-live="polite">
             {veiled ? <VeiledText text={AFTER} animate /> : BEFORE}
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             <Link to="/privacy" className="inline-flex h-11 items-center rounded-full bg-ink px-6 text-[15px] font-medium text-white hover:bg-ink-soft">
-              Redact your text
+              Redact text or a document
             </Link>
             <Link to="/actions" className="inline-flex h-11 items-center rounded-full bg-panel px-6 text-[15px] font-medium ring-1 ring-line hover:bg-sunken">
               Check an agent action
@@ -50,6 +55,7 @@ export function Home() {
           </p>
           <ul className="mt-6 flex flex-col gap-3 text-[14px]">
             <li className="flex gap-3"><Dot />Names, emails, phone numbers, money amounts, cards, bank accounts, ID numbers, places and links.</li>
+            <li className="flex gap-3"><Dot />Upload a PDF, Word, Excel, PowerPoint or text file and download it redacted.</li>
             <li className="flex gap-3"><Dot />The same value always gets the same placeholder within a session, so replies still make sense.</li>
             <li className="flex gap-3"><Dot />Paste a model’s reply back in and restore the real values, after you approve it.</li>
           </ul>
@@ -73,6 +79,25 @@ export function Home() {
             Open action protection
           </Link>
         </div>
+      </section>
+
+      <section className="border-t border-line py-16" aria-labelledby="features">
+        <h2 id="features" className="text-[28px] font-semibold tracking-[-0.025em]">Everything you can do here</h2>
+        <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ink-soft">Free, with no account. Every tool below runs in your browser.</p>
+        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {FEATURES.map((f) => (
+            <li key={f.title}>
+              <Link to={f.to} className="group flex h-full flex-col rounded-2xl bg-panel p-5 ring-1 ring-line transition-shadow hover:ring-veil-line hover:shadow-[var(--shadow-panel)]">
+                <span className="flex items-center gap-2">
+                  <span className="text-[15px] font-medium text-ink">{f.title}</span>
+                  {f.isNew ? <span className="rounded-full bg-veil-wash px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-veil-deep uppercase">New</span> : null}
+                </span>
+                <span className="mt-2 flex-1 text-[13.5px] leading-relaxed text-muted">{f.body}</span>
+                <span className="mt-4 text-[13px] font-medium text-veil-deep group-hover:underline">{f.cta}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="border-t border-line py-16">
@@ -134,6 +159,17 @@ function TokenBanner() {
     </div>
   );
 }
+
+const FEATURES: { title: string; body: string; cta: string; to: string; isNew?: boolean }[] = [
+  { title: "Redact text", body: "Paste a message, prompt or email. Names, contacts, money, cards, IDs and more become placeholders you can paste anywhere.", cta: "Redact text", to: "/privacy" },
+  { title: "Redact documents", body: "Upload a PDF, Word, Excel, PowerPoint, CSV or text file. Download the redacted version as Word, text or its own format.", cta: "Upload a document", to: "/privacy", isNew: true },
+  { title: "Restore with your approval", body: "Paste a model’s reply or upload the redacted file. Real values come back only after you approve, once.", cta: "Restore values", to: "/privacy#restore" },
+  { title: "Sessions", body: "The same person or email always gets the same placeholder in a session, so answers still make sense.", cta: "Manage sessions", to: "/privacy" },
+  { title: "Policies", body: "Write rules for what agents may do: allow, deny or ask you first. Import and export them as JSON.", cta: "Write a policy", to: "/actions#policies" },
+  { title: "Approvals", body: "Risky calls wait for you. Approvals work once, for the exact call, and expire after five minutes.", cta: "Try an approval", to: "/actions" },
+  { title: "File sandbox", body: "Add your own files, then see exactly what an agent would get when it reads them: personal details redacted.", cta: "Add a file", to: "/actions", isNew: true },
+  { title: "Decision history", body: "Every decision is logged with the agent, action and outcome. Never the contents or personal values.", cta: "See history", to: "/actions#history" },
+];
 
 function Dot() {
   return <span aria-hidden className="mt-[7px] size-1.5 shrink-0 rounded-full bg-veil" />;

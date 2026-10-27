@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { DocumentChip, DownloadButtons, DropTarget, UploadButton } from "../components/documents";
 import { CATEGORIES, DEFAULT_CATEGORIES, type Category, type Sensitivity } from "../engine/detect";
+import { FORMATS_LABEL, MAX_DOC_CHARS, type LoadedDocument } from "../engine/documents";
 import type { RestoreOutcome } from "../engine/gateway";
 import type { SanitizeResult, SessionSummary } from "../engine/vault";
 import { useEngine } from "../engine-context";
@@ -44,6 +46,17 @@ export function Privacy() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [manageOpen, setManageOpen] = useState(false);
+  const [doc, setDoc] = useState<LoadedDocument | null>(null);
+  const [resultDoc, setResultDoc] = useState<LoadedDocument | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
+
+  function loadDocument(d: LoadedDocument) {
+    setDoc(d);
+    setDocError(null);
+    setText(d.text);
+    setResult(null);
+    toast(`Read ${d.name} in your browser. Choose what to look for, then select Redact.`);
+  }
 
   const refresh = useCallback(async () => {
     let list = await engine.vault.list();
@@ -74,6 +87,7 @@ export function Privacy() {
       const r = await engine.sanitize(text, sessionId, categories, sensitivity);
       setResult(r);
       setSource(text);
+      setResultDoc(doc);
       await refresh();
     } catch (e) {
       setError(e);
@@ -144,7 +158,31 @@ export function Privacy() {
         {current ? <span className="text-muted">{current.count} stored value{current.count === 1 ? "" : "s"}</span> : null}
       </div>
 
-      <Panel className="mb-6">
+      <DropTarget className="mb-6 rounded-[24px]" onLoaded={loadDocument} onError={setDocError}>
+      <Panel>
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {doc ? (
+            <DocumentChip
+              doc={doc}
+              chars={text.length}
+              onRemove={() => {
+                setDoc(null);
+                setText("");
+                setResult(null);
+              }}
+            />
+          ) : (
+            <p className="text-[13px] text-muted">Paste text below, or upload a document. {FORMATS_LABEL}, up to 15 MB. Files are read in your browser and never uploaded anywhere.</p>
+          )}
+          <div className="shrink-0">
+            <UploadButton label={doc ? "Upload another" : "Upload a document"} variant="secondary" onLoaded={loadDocument} onError={setDocError} />
+          </div>
+        </div>
+        {docError ? (
+          <p role="alert" className="mb-3 rounded-xl bg-deny-wash px-3 py-2 text-[13px] text-deny">
+            {docError}
+          </p>
+        ) : null}
         <label htmlFor="input" className="sr-only">
           Text to redact
         </label>
@@ -152,8 +190,8 @@ export function Privacy() {
           id="input"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          rows={5}
-          maxLength={50_000}
+          rows={doc ? 10 : 5}
+          maxLength={MAX_DOC_CHARS}
           placeholder="Paste text that contains names, emails, phone numbers, amounts…"
           className="w-full resize-y rounded-2xl bg-sunken p-4 text-[15px] leading-relaxed ring-1 ring-inset ring-line placeholder:text-muted/70 focus:bg-panel focus:ring-2 focus:ring-veil focus:outline-none"
         />
@@ -169,7 +207,7 @@ export function Privacy() {
                 { value: "high", label: "More" },
               ]}
             />
-            <button type="button" onClick={() => setText(SAMPLE)} className="text-[13px] text-veil-deep hover:underline">
+            <button type="button" onClick={() => { setDoc(null); setText(SAMPLE); }} className="text-[13px] text-veil-deep hover:underline">
               Fill with sample text
             </button>
           </div>
@@ -203,21 +241,25 @@ export function Privacy() {
           <ErrorNote error={error} />
         </div>
       </Panel>
+      </DropTarget>
 
       {result ? (
         <>
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel>
               <PanelTitle hint="Highlighted parts were detected. This text stays on your device.">Original</PanelTitle>
-              <p className="text-[15px] leading-[1.8] whitespace-pre-wrap" data-testid="original-view">
+              <p className="max-h-[28rem] overflow-y-auto text-[15px] leading-[1.8] break-words whitespace-pre-wrap" data-testid="original-view">
                 {highlighted}
               </p>
             </Panel>
             <Panel className="ring-veil-line">
-              <PanelTitle hint="Safe to paste into a model or tool." action={<CopyButton value={result.sanitizedText} label="Copy redacted" />}>
+              <PanelTitle hint={resultDoc ? "Safe to paste or share. Download it as a file, or copy it." : "Safe to paste into a model or tool."} action={<CopyButton value={result.sanitizedText} label="Copy redacted" />}>
                 Redacted
               </PanelTitle>
-              <p className="text-[15px] leading-[1.8] whitespace-pre-wrap" data-testid="redacted-view">
+              <div className="-mt-2 mb-3">
+                <DownloadButtons text={result.sanitizedText} doc={resultDoc} suffix="redacted" />
+              </div>
+              <p className="max-h-[28rem] overflow-y-auto text-[15px] leading-[1.8] break-words whitespace-pre-wrap" data-testid="redacted-view">
                 <VeiledText text={result.sanitizedText} animate />
               </p>
             </Panel>
@@ -248,7 +290,7 @@ export function Privacy() {
         </>
       ) : null}
 
-      <RestorePanel sessionId={sessionId} suggestion={result?.sanitizedText} />
+      <RestorePanel sessionId={sessionId} suggestion={result?.sanitizedText} suggestionDoc={resultDoc} />
       <SessionsDialog
         open={manageOpen}
         sessions={sessions}
@@ -262,10 +304,12 @@ export function Privacy() {
   );
 }
 
-function RestorePanel({ sessionId, suggestion }: { sessionId: string; suggestion?: string }) {
+function RestorePanel({ sessionId, suggestion, suggestionDoc }: { sessionId: string; suggestion?: string; suggestionDoc: LoadedDocument | null }) {
   const engine = useEngine();
   const toast = useToast();
   const [text, setText] = useState("");
+  const [doc, setDoc] = useState<LoadedDocument | null>(null);
+  const [docError, setDocError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingRestore | null>(null);
   const [outcome, setOutcome] = useState<RestoreOutcome | null>(null);
   const [show, setShow] = useState(true);
@@ -310,7 +354,7 @@ function RestorePanel({ sessionId, suggestion }: { sessionId: string; suggestion
   }
 
   return (
-    <Panel className="mt-6">
+    <Panel className="mt-6" id="restore">
       <PanelTitle hint="Paste a reply that contains placeholders, such as a model’s answer. Only placeholders from the selected session can be restored.">
         Restore original values
       </PanelTitle>
@@ -321,17 +365,37 @@ function RestorePanel({ sessionId, suggestion }: { sessionId: string; suggestion
         id="restore-input"
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={3}
-        maxLength={50_000}
+        rows={doc ? 8 : 3}
+        maxLength={MAX_DOC_CHARS}
         placeholder="e.g. Done — I emailed [PERSON_1] at [EMAIL_1] about [AMOUNT_1]."
         className={inputClass + " h-auto resize-y py-3 leading-relaxed"}
       />
+      {docError ? (
+        <p role="alert" className="mt-3 rounded-xl bg-deny-wash px-3 py-2 text-[13px] text-deny">
+          {docError}
+        </p>
+      ) : null}
+      {doc ? (
+        <div className="mt-3">
+          <DocumentChip doc={doc} chars={text.length} onRemove={() => { setDoc(null); setText(""); setOutcome(null); }} />
+        </div>
+      ) : null}
       <div className="mt-3 flex flex-wrap gap-2">
         {suggestion ? (
-          <Button size="sm" variant="ghost" onClick={() => setText(suggestion)}>
+          <Button size="sm" variant="ghost" onClick={() => { setText(suggestion); setDoc(suggestionDoc); setOutcome(null); }}>
             Use the redacted text
           </Button>
         ) : null}
+        <UploadButton
+          label="Upload a file"
+          onLoaded={(d) => {
+            setDoc(d);
+            setText(d.text);
+            setDocError(null);
+            setOutcome(null);
+          }}
+          onError={setDocError}
+        />
         <Button size="sm" onClick={request} busy={busy} disabled={!text.trim() || !sessionId}>
           Restore values
         </Button>
@@ -346,14 +410,15 @@ function RestorePanel({ sessionId, suggestion }: { sessionId: string; suggestion
                   Restored {outcome.restored}
                   {outcome.unknown ? `, ${outcome.unknown} not from this session` : ""}
                 </Tag>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   <Button size="sm" variant="ghost" onClick={() => setShow((v) => !v)} aria-pressed={show}>
                     {show ? "Hide values" : "Show values"}
                   </Button>
                   <CopyButton value={outcome.text ?? ""} />
+                  <DownloadButtons text={outcome.text ?? ""} doc={doc} suffix="restored" />
                 </div>
               </div>
-              <p className="mt-3 text-[15px] leading-[1.8] whitespace-pre-wrap" data-testid="restored-text">
+              <p className="mt-3 max-h-[28rem] overflow-y-auto text-[15px] leading-[1.8] break-words whitespace-pre-wrap" data-testid="restored-text">
                 {show ? outcome.text : <VeiledText text={text} />}
               </p>
             </>

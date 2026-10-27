@@ -43,6 +43,20 @@ destination in Vercel → Project → **Settings → Environment Variables**, th
 Until one is set, the form tells applicants that applications aren't open yet and points them to
 Telegram and X.
 
+Setting up Telegram:
+
+1. In Telegram, message [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the token it gives you.
+2. Open your new bot's chat and press **Start** (for a private group instead, add the bot to the group and
+   send any message there).
+3. Open `https://api.telegram.org/bot<TOKEN>/getUpdates` in a browser and copy the number after
+   `"chat":{"id":`. A group's id is negative, such as `-1001234567890`.
+4. Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` in Vercel and redeploy.
+5. Open `https://<your-domain>/api/apply`. It should say `"accepting_applications": true`.
+
+If an application doesn't arrive, the function's logs (Vercel → Project → **Logs**) say why, for example
+"chat not found" with what to fix. Don't use a public channel: applications include people's names and
+emails.
+
 ## Publishing with one push
 
 ```bash

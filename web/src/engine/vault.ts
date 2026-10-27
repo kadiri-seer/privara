@@ -102,16 +102,22 @@ export class Vault {
     const key = await vaultKey(this.kv);
     const found = detect(text, categories, sensitivity);
     const redactions: Redaction[] = [];
+    // Index the session once so large documents stay fast.
+    const byDigest = new Map(session.entries.map((e) => [`${e.category}\u0000${e.digest}`, e]));
+    const perCategory = new Map<Category, number>();
+    for (const e of session.entries) perCategory.set(e.category, (perCategory.get(e.category) ?? 0) + 1);
     let out = "";
     let cursor = 0;
     for (const d of found) {
       const value = text.slice(d.start, d.end);
       const digest = await sha256Hex(`${session.salt}\u0000${d.category}\u0000${normalise(value)}`);
-      let entry = session.entries.find((e) => e.digest === digest && e.category === d.category);
+      let entry = byDigest.get(`${d.category}\u0000${digest}`);
       if (!entry) {
-        const n = session.entries.filter((e) => e.category === d.category).length + 1;
+        const n = (perCategory.get(d.category) ?? 0) + 1;
+        perCategory.set(d.category, n);
         entry = { placeholder: `[${d.category}_${n}]`, category: d.category, digest, sealed: await seal(key, value) };
         session.entries.push(entry);
+        byDigest.set(`${d.category}\u0000${digest}`, entry);
       }
       out += text.slice(cursor, d.start);
       const sanitizedStart = out.length;
@@ -125,9 +131,13 @@ export class Vault {
 
     const placeholders: SanitizeResult["placeholders"] = [];
     const categoryCounts: SanitizeResult["categoryCounts"] = {};
+    const seen = new Set<string>();
     for (const r of redactions) {
       categoryCounts[r.category] = (categoryCounts[r.category] ?? 0) + 1;
-      if (!placeholders.some((p) => p.placeholder === r.placeholder)) placeholders.push({ placeholder: r.placeholder, category: r.category });
+      if (!seen.has(r.placeholder)) {
+        seen.add(r.placeholder);
+        placeholders.push({ placeholder: r.placeholder, category: r.category });
+      }
     }
     return { sanitizedText: out, sessionId: session.id, redactions, placeholders, categoryCounts };
   }

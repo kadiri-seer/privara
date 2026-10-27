@@ -1,6 +1,6 @@
 // In-browser detection of sensitive values. Pure functions, no I/O.
 
-import { FIRST_NAMES, LOCATIONS, NOT_NAMES } from "./lexicon";
+import { AMBIGUOUS_NAMES, FIRST_NAMES, LOCATIONS, NOT_NAMES } from "./lexicon";
 
 export type Category =
   | "PERSON"
@@ -89,7 +89,7 @@ function ipv4Valid(s: string): boolean {
 // ---- pattern rules -------------------------------------------------------------------------
 const CURRENCY_PREFIX = "(?:US\\$|\\$|USD|€|EUR|£|GBP|KES|GHS|ZAR|R(?=\\d))";
 const NUMBER = "\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?";
-const SCALE = "(?:\\s?(?:k|K|m|M|bn|million|billion|thousand))?";
+const SCALE = "(?:[ \\u00a0]?(?:million|billion|thousand|bn|k|K|m|M)\\b)?";
 const CURRENCY_WORD = "(?:dollars?|USD|euros?|EUR|pounds?|GBP|cedis?|shillings?)";
 
 const RULES: Rule[] = [
@@ -113,6 +113,16 @@ const RULES: Rule[] = [
     name: "intl-phone",
     score: 0.75,
     pattern: /(?<![\w+])\+\d{1,3}[\s.-]?\(?\d{1,4}\)?(?:[\s.-]?\d{2,4}){2,4}(?!\d)/g,
+  },
+  {
+    category: "PHONE",
+    name: "national-phone",
+    score: 0.7,
+    pattern: /(?<![\w+.\/-])0\d{2,4}[\s-]?\d{3,4}[\s-]?\d{3,4}(?![\w.\/-])/g,
+    check: (m) => {
+      const n = m.replace(/\D/g, "").length;
+      return n >= 10 && n <= 11;
+    },
   },
   { category: "PHONE", name: "us-phone", score: 0.65, pattern: /(?<!\d)\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}(?!\d)/g },
   {
@@ -156,10 +166,11 @@ const LOCATION_RE = new RegExp(
 // ---- names ---------------------------------------------------------------------------------
 const TITLE = "(?:Mr|Mrs|Ms|Miss|Dr|Prof|Sir|Pastor|Rev)";
 const CAP = "[A-Z][a-z]+(?:[-'][A-Z]?[a-z]+)?";
-const TITLED_NAME = new RegExp(`\\b${TITLE}\\.?\\s+(${CAP}(?:\\s+${CAP}){0,2})`, "g");
-const CAP_RUN = new RegExp(`\\b${CAP}(?:\\s+${CAP}){1,3}\\b`, "g");
+const TITLED_NAME = new RegExp(`\\b${TITLE}\\.?[ \\u00a0]+(${CAP}(?:[ \\u00a0]+${CAP}){0,2})`, "g");
+const CAP_RUN = new RegExp(`\\b${CAP}(?:[ \\u00a0]+${CAP}){1,3}\\b`, "g");
 const SINGLE_CAP = new RegExp(`\\b${CAP}\\b`, "g");
-const NAME_CUE = /\b(?:name is|named|called|from|to|with|cc|dear|hi|hello|meet|ask|tell|pay|paid|send|sent|by|contact|for|and|thank|thanks)\s*,?\s*$/i;
+const NAME_CUE =
+  /(?:\b(?:name is|named|called|from|to|with|cc|bcc|dear|hi|hello|hey|meet|ask|tell|pay|paid|send|sent|by|contact|for|and|thank|thanks|regards|cheers|attn|signed)\s*[,:]?\s*|\b(?:name|full name|patient|customer|client|employee|contact|recipient|sender|author|owner|applicant|from|to|cc|attn)["']?\s*[:=]\s*["']?\s*)$/i;
 
 function isLocationPhrase(phrase: string): boolean {
   return LOCATIONS.some((l) => l.toLowerCase() === phrase.toLowerCase());
@@ -176,6 +187,9 @@ function detectNames(text: string): Detection[] {
     let words = [...m[0].matchAll(/\S+/g)].map((w) => ({ w: w[0], s: m.index! + w.index!, e: m.index! + w.index! + w[0].length }));
     while (words.length && NOT_NAMES.has(words[0].w.toLowerCase())) words.shift();
     while (words.length && NOT_NAMES.has(words[words.length - 1].w.toLowerCase())) words.pop();
+    // A capitalised word at the start of a sentence ("Remind John Carter") is not part of the name.
+    const firstKnown = words.findIndex((w) => FIRST_NAMES.has(w.w.toLowerCase()));
+    if (firstKnown > 0 && words.length - firstKnown >= 2) words = words.slice(firstKnown);
     if (words.length < 2) continue;
     if (words.some((w) => NOT_NAMES.has(w.w.toLowerCase()))) continue;
     const phrase = words.map((w) => w.w).join(" ");
@@ -189,7 +203,8 @@ function detectNames(text: string): Detection[] {
     const word = m[0].toLowerCase();
     if (!FIRST_NAMES.has(word) || NOT_NAMES.has(word)) continue;
     const cued = NAME_CUE.test(text.slice(Math.max(0, m.index! - 25), m.index!));
-    found.push({ category: "PERSON", start: m.index!, end: m.index! + m[0].length, score: cued ? 0.8 : 0.62, rule: "first-name" });
+    const uncuedScore = AMBIGUOUS_NAMES.has(word) ? 0.5 : 0.62;
+    found.push({ category: "PERSON", start: m.index!, end: m.index! + m[0].length, score: cued ? 0.8 : uncuedScore, rule: "first-name" });
   }
   return found;
 }

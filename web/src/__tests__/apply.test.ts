@@ -76,8 +76,43 @@ describe("early access endpoint", () => {
 
   it("says so when no destination is configured or delivery fails", async () => {
     expect((await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: {}, ip: fresh() })).status).toBe(503);
-    const failing = vi.fn().mockResolvedValue({ ok: false });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const failing = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) });
     expect((await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: TG, fetchImpl: failing, ip: fresh() })).status).toBe(502);
+  });
+
+  it("reports whether it is set up, without revealing the token or chat", async () => {
+    expect((await call({}, { method: "GET" })).json).toEqual({ accepting_applications: false, destinations: [] });
+    const r = await call({}, { method: "GET", env: TG });
+    expect(r.json).toEqual({ accepting_applications: true, destinations: ["telegram"] });
+    expect(JSON.stringify(r.json)).not.toContain("123:abc");
+  });
+
+  it("forgives spaces, quotes and a bot prefix in pasted settings", async () => {
+    const fetchImpl = okFetch();
+    await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: { TELEGRAM_BOT_TOKEN: " bot123:abc\n", TELEGRAM_CHAT_ID: ' "-100" ' }, fetchImpl, ip: fresh() });
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe("https://api.telegram.org/bot123:abc/sendMessage");
+    expect(JSON.parse(init.body).chat_id).toBe("-100");
+  });
+
+  it("follows a group that became a supergroup, and logs a hint when Telegram refuses", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const migrating = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 400, json: async () => ({ ok: false, description: "Bad Request: group chat was upgraded to a supergroup chat", parameters: { migrate_to_chat_id: -1009 } }) })
+      .mockResolvedValueOnce({ ok: true });
+    expect((await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: TG, fetchImpl: migrating, ip: fresh() })).status).toBe(200);
+    expect(JSON.parse(migrating.mock.calls[1][1].body).chat_id).toBe(-1009);
+    expect(warn.mock.calls[0][0]).toContain("-1009");
+
+    const notFound = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({ ok: false, description: "Bad Request: chat not found" }) });
+    expect((await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: TG, fetchImpl: notFound, ip: fresh() })).status).toBe(502);
+    expect(error.mock.calls.at(-1)![0]).toContain("pressed Start");
+    expect(error.mock.calls.at(-1)![0]).not.toContain("123:abc");
+    warn.mockRestore();
+    error.mockRestore();
   });
 
   it("throttles bursts from one address and only accepts POST", async () => {
@@ -85,6 +120,6 @@ describe("early access endpoint", () => {
     let last = 0;
     for (let i = 0; i < 6; i++) last = (await call({ ...VALID, started_at: Date.now() - 10_000 }, { env: TG, fetchImpl: okFetch(), ip })).status;
     expect(last).toBe(429);
-    expect((await call({}, { method: "GET" })).status).toBe(405);
+    expect((await call({}, { method: "PUT" })).status).toBe(405);
   });
 });

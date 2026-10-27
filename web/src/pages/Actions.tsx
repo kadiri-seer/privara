@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { TOOLS, TRANSFORMS, type HistoryEntry, type ToolOutcome } from "../engine/gateway";
 import { KNOWN_ACTIONS, RESOURCE_SCHEMES, type Decision, type Evaluation, type Policy, type PolicyErrors } from "../engine/policy";
 import { useEngine } from "../engine-context";
+import { UploadButton } from "../components/documents";
+import { baseName, extensionOf, type LoadedDocument } from "../engine/documents";
+import { MAX_FILE_CHARS } from "../engine/sandbox";
 import {
   Button,
   ConfirmDialog,
@@ -39,6 +42,7 @@ const OUTCOME_LABEL: Record<string, string> = {
 export function Actions() {
   const [version, setVersion] = useState(0);
   const bump = useCallback(() => setVersion((v) => v + 1), []);
+  const [preset, setPreset] = useState<{ path: string } | null>(null);
   return (
     <>
       <PageHeader
@@ -46,8 +50,8 @@ export function Actions() {
         description="Check what an AI agent is allowed to do before it does it. Tool calls are evaluated against your policies, then allowed, denied or held until you approve. Everything runs against a small file sandbox in your browser."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
-        <ToolCallPanel onChange={bump} />
-        <SandboxPanel version={version} onChange={bump} />
+        <ToolCallPanel onChange={bump} preset={preset} />
+        <SandboxPanel version={version} onChange={bump} onUploaded={(path) => setPreset({ path })} />
       </div>
       <PoliciesPanel version={version} onChange={bump} />
       <HistoryPanel version={version} onChange={bump} />
@@ -56,7 +60,7 @@ export function Actions() {
 }
 
 // ---- tool calls --------------------------------------------------------------------------------
-function ToolCallPanel({ onChange }: { onChange: () => void }) {
+function ToolCallPanel({ onChange, preset }: { onChange: () => void; preset: { path: string } | null }) {
   const engine = useEngine();
   const toast = useToast();
   const [agent, setAgent] = useState("my-agent");
@@ -72,6 +76,15 @@ function ToolCallPanel({ onChange }: { onChange: () => void }) {
   const [check, setCheck] = useState<Evaluation | null>(null);
   const [busy, setBusy] = useState(false);
   const sessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!preset) return;
+    setTool("read_file");
+    setPath(preset.path);
+    setRedactOutput(true);
+    setOutcome(null);
+    setCheck(null);
+  }, [preset]);
 
   const toolName = tool === "other" ? otherName.trim() || "unknown_tool" : tool;
   const args = (): Record<string, unknown> =>
@@ -230,7 +243,7 @@ function OutcomeCard({ outcome, onDecide, busy }: { outcome: ToolOutcome; onDeci
       {outcome.result ? (
         <div className="mt-3 rounded-xl bg-panel p-3 ring-1 ring-line">
           {"content" in outcome.result ? (
-            <p className="text-[13px] leading-relaxed whitespace-pre-wrap"><VeiledText text={String(outcome.result.content)} /></p>
+            <p className="max-h-80 overflow-y-auto text-[13px] leading-relaxed break-words whitespace-pre-wrap"><VeiledText text={String(outcome.result.content)} /></p>
           ) : (
             <pre className="overflow-x-auto font-mono text-[12px]">{JSON.stringify(outcome.result, null, 2)}</pre>
           )}
@@ -251,9 +264,27 @@ function OutcomeCard({ outcome, onDecide, busy }: { outcome: ToolOutcome; onDeci
 }
 
 // ---- sandbox ---------------------------------------------------------------------------------
-function SandboxPanel({ version, onChange }: { version: number; onChange: () => void }) {
+/** A safe sandbox path for an uploaded file: notes/<name>, text formats keep their extension. */
+export function uploadPath(doc: Pick<LoadedDocument, "name" | "kind">) {
+  const stem = baseName(doc.name).replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^[-.]+|-+$/g, "").slice(0, 60) || "upload";
+  const ext = doc.kind === "text" ? extensionOf(doc.name) : "txt";
+  return `notes/${stem}.${ext}`;
+}
+
+function SandboxPanel({ version, onChange, onUploaded }: { version: number; onChange: () => void; onUploaded: (path: string) => void }) {
   const engine = useEngine();
   const toast = useToast();
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  async function addFile(doc: LoadedDocument) {
+    const path = uploadPath(doc);
+    const content = doc.text.slice(0, MAX_FILE_CHARS);
+    await engine.sandbox.write(path, content);
+    setUploadError(null);
+    toast(content.length < doc.text.length ? `Added ${path} (first ${MAX_FILE_CHARS.toLocaleString()} characters). Try reading it as an agent.` : `Added ${path}. Try reading it as an agent.`);
+    onUploaded(path);
+    onChange();
+  }
   const [files, setFiles] = useState<{ path: string; size: number }[]>([]);
   const [viewing, setViewing] = useState<{ path: string; content: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -263,9 +294,20 @@ function SandboxPanel({ version, onChange }: { version: number; onChange: () => 
 
   return (
     <Panel>
-      <PanelTitle hint="Stored in this browser. Tools can’t reach anything outside it." action={<Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)}>Reset</Button>}>
+      <PanelTitle
+        hint="Stored in this browser. Tools can’t reach anything outside it."
+        action={
+          <div className="flex flex-wrap justify-end gap-1">
+            <UploadButton label="Add a file" onLoaded={addFile} onError={setUploadError} />
+            <Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)}>Reset</Button>
+          </div>
+        }
+      >
         Your sandbox
       </PanelTitle>
+      {uploadError ? (
+        <p role="alert" className="mb-3 rounded-xl bg-deny-wash px-3 py-2 text-[13px] text-deny">{uploadError}</p>
+      ) : null}
       <ul className="divide-y divide-line">
         {files.map((f) => (
           <li key={f.path}>
@@ -348,7 +390,7 @@ function PoliciesPanel({ version, onChange }: { version: number; onChange: () =>
   }
 
   return (
-    <Panel className="mt-6" padded={false}>
+    <Panel className="mt-6" padded={false} id="policies">
       <div className="flex flex-col gap-4 p-6 pb-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-[15px] font-semibold tracking-[-0.01em]">Your policies</h2>
@@ -514,7 +556,7 @@ function HistoryPanel({ version, onChange }: { version: number; onChange: () => 
   }, [engine, version]);
 
   return (
-    <Panel className="mt-6">
+    <Panel className="mt-6" id="history">
       <PanelTitle
         hint="Every decision made on this page, kept in this browser. It records what was asked and decided, never file contents or personal values."
         action={items.length ? <Button size="sm" variant="ghost" onClick={() => setConfirmClear(true)}>Clear</Button> : null}
