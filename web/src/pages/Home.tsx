@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { DecisionBadge, VeiledText } from "../components/ui";
+import { CopyButton, DecisionBadge, VeiledText } from "../components/ui";
 
 const BEFORE = "Send John Carter the invoice for $2,500 at john@example.com.";
 const AFTER = "Send [PERSON_1] the invoice for [AMOUNT_1] at [EMAIL_1].";
+export const TOKEN_CA = "0xdabdaf401ecb5123506ab940c9728d57e96556e3";
 
 export function Home() {
   const [veiled, setVeiled] = useState(false);
@@ -15,6 +16,7 @@ export function Home() {
   return (
     <>
       <section className="pb-16 md:pb-24">
+        <TokenBanner />
         <h1 className="max-w-3xl text-[44px] leading-[1.02] font-semibold tracking-[-0.04em] sm:text-[64px]">
           Your agents.
           <br />
@@ -106,6 +108,30 @@ export function Home() {
         </div>
       </section>
     </>
+  );
+}
+
+function TokenBanner() {
+  return (
+    <div
+      aria-label="$PRIVARA token"
+      className="mb-10 flex max-w-2xl flex-col gap-3 rounded-2xl bg-panel p-4 ring-1 ring-line shadow-[var(--shadow-panel)] sm:flex-row sm:items-center sm:gap-4 sm:rounded-full sm:py-2 sm:pr-2 sm:pl-5"
+    >
+      <p className="flex shrink-0 items-center gap-2 text-[14px] font-semibold">
+        <span aria-hidden className="relative flex size-2">
+          <span className="absolute inline-flex size-full motion-safe:animate-ping rounded-full bg-veil opacity-60" />
+          <span className="relative inline-flex size-2 rounded-full bg-veil" />
+        </span>
+        $PRIVARA is live
+      </p>
+      <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-sunken sm:rounded-full py-1 pr-1 pl-3">
+        <span className="shrink-0 text-[12px] font-medium text-muted">CA</span>
+        <code data-testid="token-ca" className="min-w-0 flex-1 font-mono break-all text-[12.5px] text-ink" title={TOKEN_CA}>
+          {TOKEN_CA}
+        </code>
+        <CopyButton value={TOKEN_CA} />
+      </div>
+    </div>
   );
 }
 

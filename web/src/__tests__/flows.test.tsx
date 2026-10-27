@@ -37,6 +37,15 @@ describe("home", () => {
     expect(screen.queryByText(/admin key/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/key/i)).not.toBeInTheDocument();
   });
+
+  it("shows the token contract address with a copy button", async () => {
+    renderAt("/");
+    const user = userEvent.setup();
+    expect(await screen.findByText("$PRIVARA is live")).toBeInTheDocument();
+    expect(screen.getByTestId("token-ca")).toHaveTextContent("0xdabdaf401ecb5123506ab940c9728d57e96556e3");
+    await user.click(screen.getByRole("button", { name: "Copy" }));
+    expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
+  });
 });
 
 describe("privacy protection", () => {
